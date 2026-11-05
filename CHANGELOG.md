@@ -10,9 +10,9 @@ Android and the web, built on the OpenDota public API.
 
 ### Added
 
-- **Twelve data surfaces** — Overview, Heroes, Hero dossier, Draft lab, Matches,
-  Match detail, Players, Player profile, Pro scene, Records, Data Lab and a
-  custom 404.
+- **Thirteen data surfaces** — Overview, Heroes, Hero dossier, Draft lab, Meta
+  escape, Matches, Match detail, Players, Player profile, Pro scene, Records,
+  Data Lab and a custom 404.
 - **Global meta lens** — ranked pubs / pro / turbo and Herald–Divine brackets,
   shared by every page and persisted locally.
 - **Hero intelligence** — sortable and filterable hero index, CSV export,
@@ -41,6 +41,11 @@ Android and the web, built on the OpenDota public API.
   reweights heroes with bracket-specific win/pick rates and penalises poor
   low-bracket win rates; counter matchups themselves use OpenDota's global
   parsed sample, which is disclosed in the UI.
+- **Meta escape** — a scouting board for underplayed heroes and underbought
+  items. It finds below-median heroes with winning matchup samples against the
+  current top five, then maps expensive low-purchase-rate items to the escape
+  heroes who actually buy them. Item cards attribute counter edges to the
+  carrier, not the item, and the page explains the 30-day purchase sample.
 - **Pinned profile** — save a public Dota profile locally. The pinned dossier
   appears above the Players directory and as a compact strip on Overview.
 - **Steam account connection** — the Windows app reads the active Steam account

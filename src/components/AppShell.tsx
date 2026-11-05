@@ -15,6 +15,7 @@ import {
   Search,
   SlidersHorizontal,
   Smartphone,
+  Sparkles,
   Swords,
   Trophy,
   Users,
@@ -37,6 +38,7 @@ const NAV = [
   { to: '/', label: 'Overview', icon: Activity, end: true },
   { to: '/heroes', label: 'Heroes', icon: Swords },
   { to: '/draft', label: 'Draft lab', icon: Crosshair },
+  { to: '/meta-escape', label: 'Meta escape', icon: Sparkles },
   { to: '/matches', label: 'Matches', icon: LayoutDashboard },
   { to: '/players', label: 'Players', icon: Users },
   { to: '/pro', label: 'Pro scene', icon: Trophy },
@@ -46,6 +48,7 @@ const NAV = [
 
 const MORE_LINKS = [
   { to: '/draft', label: 'Draft lab', hint: 'Counter-pick simulator', icon: Crosshair },
+  { to: '/meta-escape', label: 'Meta escape', hint: 'Underplayed heroes and items', icon: Sparkles },
   { to: '/pro', label: 'Pro scene', hint: 'Teams, drafts, pro meta', icon: Trophy },
   { to: '/records', label: 'Records', hint: 'The all-time leaderboards', icon: Medal },
   { to: '/data-lab', label: 'Data lab', hint: 'Query OpenDota directly', icon: Database },
@@ -56,6 +59,7 @@ const SECTION_META: { match: (path: string) => boolean; kicker: string; title: s
   { match: (path) => path.startsWith('/heroes/'), kicker: 'Hero dossier', title: 'Hero detail' },
   { match: (path) => path.startsWith('/heroes'), kicker: 'Meta index', title: 'Heroes' },
   { match: (path) => path.startsWith('/draft'), kicker: 'Draft intelligence', title: 'Draft lab' },
+  { match: (path) => path.startsWith('/meta-escape'), kicker: 'Outside the meta', title: 'Meta escape' },
   { match: (path) => /^\/matches\/[^/]+/.test(path), kicker: 'Match dossier', title: 'Match detail' },
   { match: (path) => path.startsWith('/matches'), kicker: 'Live feed', title: 'Matches' },
   { match: (path) => /^\/players\/[^/]+\/heroes\/[^/]+/.test(path), kicker: 'Player hero', title: 'Hero dossier' },
