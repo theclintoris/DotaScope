@@ -416,7 +416,7 @@ export function PlayerDetailPage() {
       </div>
 
       {matchMode === 'turbo' ? (
-        <TurboBenchmark matches={turboRows} />
+        <TurboBenchmark matches={turboRows} accountId={validId ? Number(playerId) : null} />
       ) : (
         <PerformanceReview matches={performanceRows} />
       )}

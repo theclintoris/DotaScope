@@ -30,6 +30,7 @@ import type {
 import { useMeta } from '../context/MetaContext'
 import { requestMatchParse, TTL } from '../lib/api'
 import { mergeLocalMatch, useLocalMatchStats } from '../lib/localMatchStats'
+import { WardMap } from '../components/WardMap'
 import { useDocumentTitle, useRemote } from '../lib/hooks'
 import { hasOpenDotaKey } from '../lib/settings'
 import {
@@ -359,6 +360,17 @@ export function MatchDetailPage() {
           direName={direName}
         />
       )}
+
+      {localParsed && localStats.data?.wards?.length ? (
+        <WardMap
+          wards={localStats.data.wards}
+          players={match.players}
+          heroes={heroes}
+          radiantName={radiantName}
+          direName={direName}
+          duration={match.duration}
+        />
+      ) : null}
 
       <div className="detail-layout">
         <div className="detail-main">

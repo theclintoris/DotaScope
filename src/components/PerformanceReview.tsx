@@ -11,8 +11,10 @@ import {
   Swords,
   TrendingUp,
 } from 'lucide-react'
-import type { BenchmarkMetric, BenchmarkPoint, HeroBenchmarks, RecentMatch } from '../types'
-import { fetchHeroBenchmarks } from '../lib/api'
+import type { BenchmarkMetric, BenchmarkPoint, HeroBenchmarks, PeerPlayer, RecentMatch } from '../types'
+import { fetchHeroBenchmarks, fetchRecentMatches, TTL } from '../lib/api'
+import { useRemote } from '../lib/hooks'
+import { toRecentMatch, useTurboPeerHistory } from '../lib/turboHistory'
 import { classNames, formatCompact, formatNumber } from '../lib/format'
 import { SectionHeading, Skeleton } from './ui'
 
@@ -416,7 +418,21 @@ export function PerformanceReview({ matches }: { matches: RecentMatch[] }) {
   )
 }
 
-export function TurboBenchmark({ matches }: { matches: RecentMatch[] }) {
+type TurboBenchmarkScope = 'personal' | 'friends' | 'lobby'
+
+const TURBO_SCOPE_LABELS: Record<TurboBenchmarkScope, string> = {
+  personal: 'Personal',
+  friends: 'Frequent teammates',
+  lobby: 'My games',
+}
+
+export function TurboBenchmark({
+  matches,
+  accountId,
+}: {
+  matches: RecentMatch[]
+  accountId: number | null
+}) {
   const sample = useMemo(
     () =>
       matches
@@ -425,12 +441,95 @@ export function TurboBenchmark({ matches }: { matches: RecentMatch[] }) {
     [matches],
   )
   const latest = useMemo(() => sample.slice(0, 5), [sample])
-  const baseline = useMemo(() => sample.slice(5), [sample])
+  const personalBaseline = useMemo(() => sample.slice(5), [sample])
+  const [scope, setScope] = useState<TurboBenchmarkScope>('personal')
+  const [friendSample, setFriendSample] = useState<RecentMatch[]>([])
+  const [friendLoading, setFriendLoading] = useState(false)
+  const [friendError, setFriendError] = useState('')
+
+  const peers = useRemote<PeerPlayer[]>(
+    accountId ? `/players/${accountId}/peers` : null,
+    TTL.player,
+  )
+  const peerHistory = useTurboPeerHistory(accountId)
+
+  const frequentPeers = useMemo(
+    () =>
+      (peers.data ?? [])
+        .filter((peer) => peer.with_games >= 2 && Number.isFinite(peer.account_id))
+        .sort((a, b) => b.with_games - a.with_games)
+        .slice(0, 6),
+    [peers.data],
+  )
+
+  const lobbySample = useMemo(
+    () =>
+      peerHistory.rows
+        .filter((row) => Number(row.account_id) !== accountId)
+        .map(toRecentMatch),
+    [accountId, peerHistory.rows],
+  )
+
+  useEffect(() => {
+    if (scope !== 'friends' || !accountId || !peers.data) return
+    if (!frequentPeers.length) {
+      setFriendSample([])
+      setFriendError('No frequent teammates have a parsed Turbo sample yet.')
+      setFriendLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setFriendLoading(true)
+    setFriendError('')
+    Promise.allSettled(
+      frequentPeers.map((peer) => fetchRecentMatches(String(peer.account_id))),
+    )
+      .then((results) => {
+        if (cancelled) return
+        const rows: RecentMatch[] = []
+        let failures = 0
+        results.forEach((result) => {
+          if (result.status === 'fulfilled') {
+            rows.push(...result.value.filter((match) => match.game_mode === 23 && match.duration > 300))
+          } else {
+            failures += 1
+          }
+        })
+        setFriendSample(rows)
+        if (failures === results.length) {
+          setFriendError('Teammate match history is unavailable right now.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setFriendLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [accountId, frequentPeers, peers.data, scope])
+
+  const comparisonRows = useMemo(() => {
+    if (scope === 'friends') return friendSample
+    if (scope === 'lobby') return lobbySample
+    return personalBaseline.length ? personalBaseline : sample
+  }, [friendSample, lobbySample, personalBaseline, sample, scope])
+
+  const comparisonLabel =
+    scope === 'friends'
+      ? `${frequentPeers.length} frequent teammates' recent Turbo games`
+      : scope === 'lobby'
+        ? `${lobbySample.length} other players from your parsed Turbo games`
+        : `${Math.max(comparisonRows.length, 1)} earlier Turbo games`
+
+  const scopeBusy =
+    scope === 'friends' && (peers.loading || friendLoading || (peers.loading && !peers.data))
 
   const metricStats = useMemo(() => {
     return METRICS.map((metric) => {
       const latestValue = median(latest.map(metric.raw))
-      const baselineValue = median((baseline.length ? baseline : sample).map(metric.raw))
+      const baselineValue = median(comparisonRows.map(metric.raw))
       const delta =
         latestValue != null && baselineValue != null && baselineValue !== 0
           ? (metric.better === 'low' ? baselineValue - latestValue : latestValue - baselineValue) / Math.abs(baselineValue)
@@ -446,7 +545,7 @@ export function TurboBenchmark({ matches }: { matches: RecentMatch[] }) {
         score,
       }
     })
-  }, [baseline, latest, sample])
+  }, [comparisonRows, latest])
 
   const overall = median(
     metricStats
@@ -513,13 +612,43 @@ export function TurboBenchmark({ matches }: { matches: RecentMatch[] }) {
       <SectionHeading
         eyebrow="Turbo benchmark"
         title="Turbo games, benchmarked"
-        hint={`latest 5 vs ${baseline.length || 1} earlier Turbo games`}
+        hint={`latest 5 vs ${comparisonLabel}`}
         action={
           <span className="badge badge-muted">
-            <ShieldCheck size={12} /> Personal baseline
+            <ShieldCheck size={12} /> {TURBO_SCOPE_LABELS[scope]}
           </span>
         }
       />
+
+      <div className="benchmark-scopes" role="tablist" aria-label="Benchmark comparison">
+        {(['personal', 'friends', 'lobby'] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={scope === value}
+            className={classNames('benchmark-scope', scope === value && 'is-active')}
+            onClick={() => setScope(value)}
+          >
+            {TURBO_SCOPE_LABELS[value]}
+          </button>
+        ))}
+        <span className="benchmark-scope-note">
+          {scope === 'personal'
+            ? 'Your latest five games against your earlier Turbo history.'
+            : scope === 'friends'
+              ? 'Players you have shared at least two games with; their recent Turbo sample.'
+              : 'Every other player in your locally parsed Turbo games.'}
+        </span>
+      </div>
+
+      {scope !== 'personal' && (scopeBusy || friendError || (!comparisonRows.length && !peerHistory.loading)) ? (
+        <p className={classNames('benchmark-scope-status', friendError && 'is-error')}>
+          {scopeBusy
+            ? 'Pulling comparison sample…'
+            : friendError || 'No comparison sample is available yet. Parse more games to widen this benchmark.'}
+        </p>
+      ) : null}
 
       <div className="review-grid">
         <div className="panel review-panel">
@@ -531,7 +660,12 @@ export function TurboBenchmark({ matches }: { matches: RecentMatch[] }) {
                 <span>{scoreBand(overall)}</span>
               </div>
               <p>
-                Latest five Turbo games ({wins}-{latest.length - wins}) compared with your earlier Turbo history.
+                Latest five Turbo games ({wins}-{latest.length - wins}) compared with{' '}
+                {scope === 'personal'
+                  ? 'your earlier Turbo history'
+                  : scope === 'friends'
+                    ? 'frequent teammates’ recent Turbo games'
+                    : 'other players in your parsed Turbo games'}.
               </p>
             </div>
             <div
@@ -572,8 +706,11 @@ export function TurboBenchmark({ matches }: { matches: RecentMatch[] }) {
           </div>
 
           <p className="panel-footnote">
-            OpenDota has no global Turbo benchmark split. This compares your latest five parsed Turbo games with
-            your earlier Turbo history. Local parser games join the sample automatically; small samples are noisy.
+            {scope === 'personal'
+              ? 'OpenDota has no global Turbo benchmark split. This compares your latest five parsed Turbo games with your earlier Turbo history. Local parser games join the sample automatically; small samples are noisy.'
+              : scope === 'friends'
+                ? 'Frequent teammates are players with at least two shared games. Their latest OpenDota Turbo games form the baseline; this measures your form against the people you queue with, not a global percentile.'
+                : 'The lobby baseline uses every other player in your locally parsed Turbo matches, teammates and opponents. It is a same-games peer benchmark, not a global percentile.'}
           </p>
         </div>
 

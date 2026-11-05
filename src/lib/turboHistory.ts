@@ -3,7 +3,7 @@ import type { RecentMatch } from '../types'
 
 const TURBO_HISTORY_ORIGIN = 'http://127.0.0.1:5601'
 
-interface TurboHistoryRow {
+export interface TurboHistoryRow {
   match_id: number
   account_id: number
   player_slot: number
@@ -28,7 +28,7 @@ interface TurboHistoryResponse {
   matches?: TurboHistoryRow[]
 }
 
-function toRecentMatch(row: TurboHistoryRow): RecentMatch {
+export function toRecentMatch(row: TurboHistoryRow): RecentMatch {
   return {
     match_id: row.match_id,
     player_slot: row.player_slot,
@@ -136,4 +136,58 @@ export function useMergedRecent(
     () => mergeRecentWithTurbo(recent, history.rows),
     [recent, history.rows],
   )
+}
+
+export interface TurboPeerHistoryState {
+  rows: TurboHistoryRow[]
+  loading: boolean
+  available: boolean
+}
+
+/** All players from the local history that belong to this account's matches. */
+export function useTurboPeerHistory(accountId: number | null): TurboPeerHistoryState {
+  const [rows, setRows] = useState<TurboHistoryRow[]>([])
+  const [loading, setLoading] = useState(Boolean(accountId))
+  const [available, setAvailable] = useState(false)
+
+  useEffect(() => {
+    if (!accountId) {
+      setRows([])
+      setLoading(false)
+      setAvailable(false)
+      return
+    }
+
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 6000)
+    setLoading(true)
+
+    fetch(
+      `${TURBO_HISTORY_ORIGIN}/turbo-history?accountId=${accountId}&includePeers=1&limit=5000`,
+      { signal: controller.signal },
+    )
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Turbo peer history unavailable (${response.status})`)
+        return (await response.json()) as TurboHistoryResponse
+      })
+      .then((payload) => {
+        const next = (payload.matches ?? []).filter((row) => Number.isFinite(row.match_id))
+        setRows(next)
+        setAvailable(next.length > 0)
+      })
+      .catch(() => {
+        setAvailable(false)
+      })
+      .finally(() => {
+        window.clearTimeout(timeout)
+        setLoading(false)
+      })
+
+    return () => {
+      window.clearTimeout(timeout)
+      controller.abort()
+    }
+  }, [accountId])
+
+  return { rows, loading, available }
 }

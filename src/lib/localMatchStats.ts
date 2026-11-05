@@ -42,6 +42,20 @@ export interface LocalParsedTimelinePoint {
   direXp: number
 }
 
+export interface LocalParsedWard {
+  id: string
+  kind: 'observer' | 'sentry'
+  time: number
+  x: number
+  y: number
+  endTime: number
+  destroyed: boolean
+  team: 'radiant' | 'dire'
+  playerSlot: number
+  accountId: number | null
+  heroId: number | null
+}
+
 export interface LocalParsedMatch {
   match?: {
     matchId: string | number
@@ -52,6 +66,7 @@ export interface LocalParsedMatch {
   }
   players?: LocalParsedPlayer[]
   timeline?: LocalParsedTimelinePoint[]
+  wards?: LocalParsedWard[]
 }
 
 export interface LocalMatchState {

@@ -21,12 +21,17 @@ All notable changes to DotaScope are recorded here. The public release lives at
 - **Vision & Utility** — parsed matches expose observer/sentry wards, dewards,
   camps stacked, runes, stuns, smoke and gem purchases per player. Unparsed
   matches offer a replay-parse request when a key is configured.
+- **Ward map** — locally parsed matches plot all observer and sentry placements
+  on the Dota map. Hover or tap a marker for the placing hero, match time,
+  expiry/destroy time; filter by ward type and Radiant/Dire. The worker now
+  includes a `wards` payload with the existing timeline.
 - **Ranked performance review** — OpenDota hero-benchmark percentiles and review
   flags use only ranked standard games.
-- **Turbo form benchmark** — a personal-baseline Turbo benchmark comparing your
-  latest five parsed Turbo games with earlier Turbo history. It uses all locally
-  available parsed Turbo games, not OpenDota's 20-game cap, and states that
-  OpenDota has no global Turbo benchmark split.
+- **Turbo form benchmark scopes** — the Turbo benchmark now offers three
+  comparisons: personal history, players you have shared at least two games
+  with, and every other player in your parsed Turbo games. All scopes use the
+  local parsed history and state their sample source; OpenDota has no global
+  Turbo benchmark split.
 - **Persistent Turbo history** — locally parsed Turbo games are stored in
   `worker/data/turbo-history.json`; player, hero and My matches views merge them
   with OpenDota's latest-20 feed, so history can grow one finished game at a

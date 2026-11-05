@@ -175,6 +175,8 @@ async function summarise(rawPath, matchId) {
   const timelineBuckets = new Map()
   const playerSlots = new Map()
   const epiloguePlayers = []
+  const wardEvents = []
+  const wardRemovals = new Map()
   let epilogueDota = null
   let lineCount = 0
 
@@ -224,6 +226,17 @@ async function summarise(rawPath, matchId) {
         const previousEntry = entries.get(row.slot)
         if (!previousEntry || time >= asNumber(previousEntry.time)) entries.set(row.slot, row)
       }
+    } else if ((row.type === 'obs' || row.type === 'sen') && Number.isFinite(row.slot)) {
+      wardEvents.push({
+        kind: row.type === 'obs' ? 'observer' : 'sentry',
+        time: asNumber(row.time),
+        rawSlot: asNumber(row.slot),
+        x: asNumber(row.x),
+        y: asNumber(row.y),
+        ehandle: row.ehandle ?? null,
+      })
+    } else if ((row.type === 'obs_left' || row.type === 'sen_left') && row.ehandle != null) {
+      wardRemovals.set(String(row.ehandle), asNumber(row.time))
     }
   }
 
@@ -299,6 +312,31 @@ async function summarise(rawPath, matchId) {
       }
     })
 
+  const playerBySlot = new Map(players.map((player) => [player.slot, player]))
+  const wards = wardEvents
+    .map((event) => {
+      const player = playerBySlot.get(event.rawSlot)
+      const lifetime = event.kind === 'observer' ? 360 : 480
+      const startTime = Math.max(0, event.time)
+      const removal = event.ehandle == null ? null : wardRemovals.get(String(event.ehandle))
+      const destroyed = removal != null && removal >= event.time
+      const endTime = Math.min(duration, removal != null ? removal : startTime + lifetime)
+      return {
+        id: `${event.kind}-${event.time}-${event.ehandle ?? event.rawSlot}`,
+        kind: event.kind,
+        time: startTime,
+        x: Number(event.x.toFixed(2)),
+        y: Number(event.y.toFixed(2)),
+        endTime: Math.max(startTime, endTime),
+        destroyed,
+        team: player?.team ?? teamOf(event.rawSlot),
+        playerSlot: player?.playerSlot ?? event.rawSlot,
+        accountId: player?.accountId ?? null,
+        heroId: player?.heroId ?? null,
+      }
+    })
+    .sort((a, b) => a.time - b.time)
+
   const radiantKills = players.filter((p) => p.team === 'radiant').reduce((sum, p) => sum + p.kills, 0)
   const direKills = players.filter((p) => p.team === 'dire').reduce((sum, p) => sum + p.kills, 0)
   const gameMode = asNumber(match?.game_mode) || asNumber(epilogueDota?.gameMode_)
@@ -345,6 +383,7 @@ async function summarise(rawPath, matchId) {
     },
     players,
     timeline,
+    wards,
     generatedAt: new Date().toISOString(),
   }
 }
@@ -430,8 +469,17 @@ async function parseReplay(matchId, options = {}) {
   const statsPath = join(DATA_DIR, `${matchId}.stats.json`)
   if (!force && existsSync(statsPath)) {
     const cachedStats = JSON.parse(readFileSync(statsPath, 'utf8'))
-    try { recordParsedHistories(cachedStats) } catch { /* cache remains usable */ }
-    return { cached: true, ...cachedStats }
+    const hasWardPayload = Array.isArray(cachedStats.wards)
+    const hasTimeline = Array.isArray(cachedStats.timeline)
+    if (hasWardPayload && hasTimeline) {
+      try { recordParsedHistories(cachedStats) } catch { /* cache remains usable */ }
+      return { cached: true, ...cachedStats }
+    }
+    // Old cache: upgrade it when the replay is still available locally.
+    if (!existsSync(replayPath(matchId))) {
+      try { recordParsedHistories(cachedStats) } catch { /* cache remains usable */ }
+      return { cached: true, ...cachedStats }
+    }
   }
 
   if (!(await ensureParser())) throw new Error('OpenDota parser is not reachable.')
@@ -535,6 +583,19 @@ function historyFor(path, accountId, limit) {
 
 function turboHistoryFor(accountId, limit) {
   return historyFor(TURBO_HISTORY_PATH, accountId, limit)
+}
+
+function turboHistoryWithPeers(accountId, limit) {
+  if (!accountId) return []
+  const rows = loadHistory(TURBO_HISTORY_PATH)
+  const matchIds = new Set(
+    rows.filter((row) => Number(row.account_id) === accountId).map((row) => row.match_id),
+  )
+  if (!matchIds.size) return []
+  return rows
+    .filter((row) => matchIds.has(row.match_id))
+    .sort((a, b) => b.start_time - a.start_time)
+    .slice(0, limit)
 }
 
 function rankedHistoryFor(accountId, limit) {
@@ -654,9 +715,12 @@ const server = createServer(async (req, res) => {
 
     if (req.method === 'GET' && url.pathname === '/turbo-history') {
       const accountId = Number(url.searchParams.get('accountId') ?? 0) || null
+      const includePeers = url.searchParams.get('includePeers') === '1'
       const limit = Math.max(1, Math.min(5000, Number(url.searchParams.get('limit') ?? 1000) || 1000))
-      const matches = turboHistoryFor(accountId, limit)
-      return json(res, 200, { accountId, count: matches.length, matches })
+      const matches = includePeers
+        ? turboHistoryWithPeers(accountId, limit)
+        : turboHistoryFor(accountId, limit)
+      return json(res, 200, { accountId, includePeers, count: matches.length, matches })
     }
 
     if (req.method === 'GET' && url.pathname === '/ranked-history') {
