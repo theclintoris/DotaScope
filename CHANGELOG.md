@@ -21,23 +21,46 @@ All notable changes to DotaScope are recorded here. The public release lives at
 - **Vision & Utility** — parsed matches expose observer/sentry wards, dewards,
   camps stacked, runes, stuns, smoke and gem purchases per player. Unparsed
   matches offer a replay-parse request when a key is configured.
-- **Ranked-only performance review** — benchmark percentiles and review flags
-  now use only ranked standard games; Turbo and unranked matches are excluded.
-- **Live suggestions** — a Windows-only GSI cockpit that reads the local Dota 2
-  game through a loopback bridge and proposes popular phase items plus curated
-  counters for the visible draft. Normal play exposes only your own inventory;
-  spectating can expose all-player data. Includes downloadable GSI config,
-  setup states and honest source limitations.
+- **Ranked performance review** — OpenDota hero-benchmark percentiles and review
+  flags use only ranked standard games.
+- **Turbo form benchmark** — a personal-baseline Turbo benchmark comparing your
+  latest five parsed Turbo games with earlier Turbo history. It uses all locally
+  available parsed Turbo games, not OpenDota's 20-game cap, and states that
+  OpenDota has no global Turbo benchmark split.
+- **Persistent Turbo history** — locally parsed Turbo games are stored in
+  `worker/data/turbo-history.json`; player, hero and My matches views merge them
+  with OpenDota's latest-20 feed, so history can grow one finished game at a
+  time instead of stopping at 20. OpenDota has no public Turbo career endpoint.
 - **Hero and match-history grades** — S–D current-meta grades plus a +/−
   expectation flag comparing the player's hero win rate with their rank
   bracket's baseline.
+- **Global Ranked/Turbo switch** — a top-bar lens now drives the player
+  dossier, hero pool, performance review, player hero history, and the new
+  **My matches** tab as well as the existing meta pages. Turbo uses OpenDota's
+  latest-20 sample plus locally parsed Turbo history; the UI labels the source
+  rather than inventing career totals.
+- **My matches** — the pinned profile's own ranked or Turbo games in the
+  Matches explorer, with result, hero, KDA, GPM where available, mode and
+  duration. Ranked loads the latest 500 profile matches; Turbo loads the
+  latest-20 feed plus locally parsed Turbo history.
+- **Parser lab** — local OpenDota replay parser plus replay shelf, Turbo
+  download/decompression, parsed scoreboard and utility stats. Runs entirely
+  on the local machine; see the README setup.
+- **Removed Live suggestions** — the GSI cockpit UI was removed as unnecessary.
+  The loopback GSI bridge and post-game watcher remain because auto-parse needs
+  them; setup now lives under Turbo auto-parse in the README.
+- **Automatic Turbo parsing** — while DotaScope is open on Windows, the
+  post-game GSI state triggers a background parse of the finished Turbo match
+  when the local worker is running, with a progress toast and Parser lab link.
 
 ### Changed
 
 - Meta escape's item cards now attribute matchup edges to the carrier hero;
   the off-meta build card label names the meta hero in its matchup line.
-- README documents Immortal, replay parsing, API key security, and the
-  Source/attribution for Spectral.
+- README documents Immortal, replay parsing, API key security, the local
+  parser worker, auto-parse prerequisites, and the Source/attribution for
+  Spectral. The public match feed is described honestly as ranked/standard only;
+  Turbo history is OpenDota's latest-20 sample extended by local parses.
 
 ### Fixed
 

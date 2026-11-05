@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowUpRight,
   CalendarDays,
   Clock3,
   Filter,
+  History,
   Radio,
   RefreshCw,
   Search,
@@ -14,13 +15,23 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import type { ProMatch, PublicMatch } from '../types'
+import type { PlayerMatch, ProMatch, PublicMatch, RecentMatch } from '../types'
 import { TTL } from '../lib/api'
 import { useDebouncedValue, useDocumentTitle, useRemote } from '../lib/hooks'
+import { mergeRecentWithTurbo, useTurboHistory } from '../lib/turboHistory'
+import { useMeta } from '../context/MetaContext'
+import { useProfile } from '../context/ProfileContext'
+import {
+  MATCH_MODE_COPY,
+  isPerformanceMatch,
+  matchWon,
+  passesMatchMode,
+  type MatchSummary,
+} from '../lib/matchMode'
 import {
   GAME_MODE_FILTERS,
-  LOBBY_FILTERS,
   gameModeName,
+  LOBBY_FILTERS,
   lobbyName,
   rankMedal,
 } from '../lib/constants'
@@ -37,16 +48,21 @@ import {
   ErrorState,
   PageHeader,
   PageLoader,
+  HeroPortrait,
   SectionHeading,
   TeamBadge,
 } from '../components/ui'
 
-type Tab = 'pro' | 'public'
+type Tab = 'pro' | 'public' | 'mine'
 type ProSort = 'newest' | 'longest' | 'closest'
 type WindowFilter = 'all' | '24h' | '7d'
 
 export function MatchesPage() {
   useDocumentTitle('Matches')
+  const meta = useMeta()
+  const { accountId, profile } = useProfile()
+  const matchMode = meta.matchMode
+  const modeCopy = MATCH_MODE_COPY[matchMode]
   const [tab, setTab] = useState<Tab>('pro')
   const [search, setSearch] = useState('')
   const [mode, setMode] = useState('all')
@@ -59,6 +75,25 @@ export function MatchesPage() {
 
   const pro = useRemote<ProMatch[]>('/proMatches', TTL.feed)
   const pubs = useRemote<PublicMatch[]>('/publicMatches', TTL.feed)
+  const rankedMine = useRemote<PlayerMatch[]>(
+    accountId ? `/players/${accountId}/matches?limit=500&lobby_type=7` : null,
+    TTL.player,
+  )
+  const recentMine = useRemote<RecentMatch[]>(
+    accountId ? `/players/${accountId}/recentMatches` : null,
+    TTL.player,
+  )
+  const turboHistory = useTurboHistory(accountId)
+  const allRecentMine = useMemo(
+    () => mergeRecentWithTurbo(recentMine.data ?? undefined, turboHistory.rows),
+    [recentMine.data, turboHistory.rows],
+  )
+
+  useEffect(() => {
+    if (tab === 'public' && matchMode === 'ranked') setMode('22')
+    else if (tab === 'public' && matchMode === 'turbo') setMode('23')
+    else if (tab === 'public' && matchMode === 'all') setMode('all')
+  }, [matchMode, tab])
 
   const proRows = useMemo(() => {
     const now = Math.floor(Date.now() / 1000)
@@ -99,14 +134,71 @@ export function MatchesPage() {
       .sort((a, b) => b.start_time - a.start_time)
   }, [pubs.data, debouncedSearch, mode, lobby, rankFilter])
 
+  const mineRows = useMemo(() => {
+    const source: MatchSummary[] = [
+      ...(rankedMine.data ?? []),
+      ...allRecentMine,
+    ]
+    const unique = new Map<number, MatchSummary>()
+    source.forEach((match) => {
+      if (passesMatchMode(match, matchMode) && !unique.has(match.match_id)) {
+        unique.set(match.match_id, match)
+      }
+    })
+    const query = debouncedSearch.trim().toLowerCase()
+    return [...unique.values()]
+      .filter((match) => {
+        if (!query) return true
+        if (String(match.match_id).includes(query)) return true
+        const hero = meta.heroes.find((entry) => entry.id === match.hero_id)
+        return Boolean(hero?.localized_name.toLowerCase().includes(query))
+      })
+      .sort((a, b) => b.start_time - a.start_time)
+  }, [rankedMine.data, allRecentMine, matchMode, debouncedSearch, meta.heroes])
+
   const activeRows = tab === 'pro' ? proRows : publicRows
   const active = tab === 'pro' ? pro : pubs
   const filtersActive =
     Boolean(search) ||
     windowFilter !== 'all' ||
     (tab === 'public' && (mode !== 'all' || lobby !== 'all' || rankFilter !== 'all'))
+  const mineLoading = rankedMine.loading || recentMine.loading
+  const mineError = rankedMine.error ?? recentMine.error
+  const refreshMine = () => {
+    rankedMine.refresh()
+    recentMine.refresh()
+  }
+  const activeLoading = tab === 'mine' ? mineLoading && !mineRows.length : active.loading && !active.data
+  const activeError = tab === 'mine' ? mineError : active.error
+  const refreshActive = tab === 'mine' ? refreshMine : active.refresh
 
   const summary = useMemo(() => {
+    if (tab === 'mine') {
+      const wins = mineRows.filter(matchWon).length
+      const totalDuration = mineRows.reduce((sum, match) => sum + match.duration, 0)
+      const totalKills = mineRows.reduce((sum, match) => sum + (match.kills ?? 0), 0)
+      const totalDeaths = mineRows.reduce((sum, match) => sum + (match.deaths ?? 0), 0)
+      const totalAssists = mineRows.reduce((sum, match) => sum + (match.assists ?? 0), 0)
+      const kda = totalDeaths > 0 ? (totalKills + totalAssists) / totalDeaths : totalKills + totalAssists
+      return [
+        {
+          label: matchMode === 'turbo' ? 'Turbo sample' : matchMode === 'ranked' ? 'My ranked games' : 'My games',
+          value: formatNumber(mineRows.length),
+          foot: matchMode === 'turbo' ? (turboHistory.available ? 'sample + parsed history' : 'latest 20 matches') : 'matching profile',
+        },
+        {
+          label: 'Win rate',
+          value: mineRows.length ? formatPercent(wins / mineRows.length) : '—',
+          foot: `${wins} wins · ${mineRows.length - wins} losses`,
+        },
+        { label: 'Average KDA', value: mineRows.length ? kda.toFixed(2) : '—', foot: 'kills + assists / deaths' },
+        {
+          label: 'Average length',
+          value: mineRows.length ? formatDuration(Math.round(totalDuration / mineRows.length)) : '—',
+          foot: 'sample average',
+        },
+      ]
+    }
     if (tab === 'pro') {
       const rows = pro.data ?? []
       const totalDuration = rows.reduce((sum, match) => sum + match.duration, 0)
@@ -143,7 +235,7 @@ export function MatchesPage() {
       },
       { label: 'Visible now', value: formatNumber(activeRows.length), foot: 'after filters' },
     ]
-  }, [tab, pro.data, pubs.data, activeRows.length])
+  }, [tab, matchMode, mineRows, pro.data, pubs.data, activeRows.length])
 
   const resetFilters = () => {
     setSearch('')
@@ -159,10 +251,10 @@ export function MatchesPage() {
       <PageHeader
         eyebrow="Match intelligence"
         title="Match explorer"
-        description="Track the professional circuit and the live public queue. Filter the latest OpenDota sample, then open any match for a full scoreboard."
+        description="Track the professional circuit, the public queue, or your own ranked and Turbo history."
         actions={
-          <button className="btn btn-ghost" onClick={() => active.refresh()} disabled={active.loading}>
-            <RefreshCw size={14} className={active.loading ? 'spin' : undefined} /> Refresh feed
+          <button className="btn btn-ghost" onClick={refreshActive} disabled={activeLoading}>
+            <RefreshCw size={14} className={activeLoading ? 'spin' : undefined} /> Refresh feed
           </button>
         }
       />
@@ -206,6 +298,16 @@ export function MatchesPage() {
         >
           <Radio size={15} /> Public queue <span>{formatNumber(pubs.data?.length ?? 0)}</span>
         </button>
+        <button
+          className={classNames('feed-tab', tab === 'mine' && 'is-active')}
+          onClick={() => {
+            setTab('mine')
+            setSearch('')
+            setVisible(24)
+          }}
+        >
+          <History size={15} /> My matches <span>{profile ? formatNumber(mineRows.length) : '—'}</span>
+        </button>
         <span className="feed-live">
           <span className="live-dot" /> OpenDota feed
         </span>
@@ -220,7 +322,13 @@ export function MatchesPage() {
               setSearch(event.target.value)
               setVisible(24)
             }}
-            placeholder={tab === 'pro' ? 'Search teams, league, match ID…' : 'Search match ID…'}
+            placeholder={
+              tab === 'pro'
+                ? 'Search teams, league, match ID…'
+                : tab === 'mine'
+                  ? 'Search hero or match ID…'
+                  : 'Search match ID…'
+            }
           />
           {search && (
             <button className="icon-btn" onClick={() => setSearch('')} aria-label="Clear search">
@@ -266,7 +374,7 @@ export function MatchesPage() {
               </select>
             </label>
           </>
-        ) : (
+        ) : tab === 'public' ? (
           <>
             <label className="select-field">
               <span>Lobby</span>
@@ -291,6 +399,11 @@ export function MatchesPage() {
               </select>
             </label>
           </>
+        ) : (
+          <div className="filter-mode-note">
+            <span className={`mode-chip is-${matchMode}`}>{modeCopy.label}</span>
+            <small>{modeCopy.note}</small>
+          </div>
         )}
         {filtersActive && (
           <button className="btn btn-ghost btn-sm filter-reset" onClick={resetFilters}>
@@ -299,10 +412,56 @@ export function MatchesPage() {
         )}
       </div>
 
-      {active.loading && !active.data ? (
+      {tab === 'mine' ? (
+        !profile ? (
+          <EmptyState
+            title="Pin a player profile first"
+            icon={<History size={22} />}
+            action={
+              <Link className="btn btn-amber btn-sm" to="/players">
+                Find my profile
+              </Link>
+            }
+          >
+            Choose your Steam or OpenDota account in Players, then your ranked and Turbo matches will appear
+            here automatically.
+          </EmptyState>
+        ) : activeLoading ? (
+          <PageLoader label={`Loading ${modeCopy.short} matches…`} />
+        ) : activeError ? (
+          <ErrorState error={activeError} onRetry={refreshMine} title="Your matches are unavailable" />
+        ) : mineRows.length === 0 ? (
+          <EmptyState
+            title={`No ${modeCopy.label.toLowerCase()} found`}
+            icon={<Filter size={22} />}
+            action={
+              <button className="btn btn-ghost btn-sm" onClick={resetFilters}>
+                Clear search
+              </button>
+            }
+          >
+            {matchMode === 'turbo'
+              ? 'OpenDota only exposes Turbo games in the latest 20-match sample. Play a Turbo game, then refresh.'
+              : 'This mode has no matching games in the available OpenDota history.'}
+          </EmptyState>
+        ) : (
+          <div className="my-match-list">
+            {mineRows.slice(0, visible).map((match) => (
+              <MyMatchCard key={match.match_id} match={match} />
+            ))}
+            {visible < mineRows.length && (
+              <div className="load-more-row">
+                <button className="btn btn-ghost" onClick={() => setVisible((count) => count + 24)}>
+                  Load more <span>{formatNumber(mineRows.length - visible)} remaining</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )
+      ) : activeLoading ? (
         <PageLoader label={tab === 'pro' ? 'Loading pro matches…' : 'Loading public matches…'} />
-      ) : active.error && !active.data ? (
-        <ErrorState error={active.error} onRetry={active.refresh} title="Match feed unavailable" />
+      ) : activeError ? (
+        <ErrorState error={activeError} onRetry={refreshActive} title="Match feed unavailable" />
       ) : activeRows.length === 0 ? (
         <EmptyState
           title="No matches match these filters"
@@ -348,9 +507,9 @@ export function MatchesPage() {
         <section className="panel">
           <SectionHeading eyebrow="Reading the feed" title="What this sample is" />
           <p className="muted-copy">
-            OpenDota exposes the most recent 100 pro matches and 100 public matches. The feed is not a complete
-            archive: pro rows include league and team metadata, while public rows expose only an average rank
-            tier and mode. Both link to the full parsed match page.
+            OpenDota exposes the most recent 100 pro matches and 100 public matches. Your own tab uses ranked
+            match history plus OpenDota’s latest 20-match feed. Locally parsed Turbo games extend this sample automatically.
+            Turbo is therefore a sample, not full career history. Every row links to the full parsed match page.
           </p>
         </section>
         <section className="panel">
@@ -362,6 +521,39 @@ export function MatchesPage() {
         </section>
       </div>
     </div>
+  )
+}
+
+function MyMatchCard({ match }: { match: MatchSummary }) {
+  const meta = useMeta()
+  const hero = meta.heroes.find((entry) => entry.id === match.hero_id)
+  const won = matchWon(match)
+  const performance = isPerformanceMatch(match)
+  const kills = match.kills ?? 0
+  const deaths = match.deaths ?? 0
+  const assists = match.assists ?? 0
+  return (
+    <Link className={classNames('my-match-card', won ? 'is-win' : 'is-loss')} to={`/matches/${match.match_id}`}>
+      <span className="my-match-result">{won ? 'Win' : 'Loss'}</span>
+      <HeroPortrait hero={hero} size="md" />
+      <div className="my-match-hero">
+        <strong>{hero?.localized_name ?? `Hero ${match.hero_id}`}</strong>
+        <small>
+          {gameModeName(match.game_mode)} · {formatDuration(match.duration)} · {timeAgo(match.start_time)}
+        </small>
+      </div>
+      <div className="my-match-kda">
+        <strong>
+          {kills} / {deaths} / {assists}
+        </strong>
+        <small>K / D / A</small>
+      </div>
+      <div className="my-match-extra">
+        <strong>{performance ? formatNumber(match.gold_per_min) : '—'}</strong>
+        <small>{performance ? 'GPM' : match.lobby_type === 7 ? 'Ranked' : 'Standard'}</small>
+      </div>
+      <ArrowUpRight size={15} className="my-match-arrow" />
+    </Link>
   )
 }
 

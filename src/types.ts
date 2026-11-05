@@ -1,5 +1,7 @@
 export type Population = 'ranked' | 'pro' | 'turbo' | 'immortal'
 
+export type MatchMode = 'ranked' | 'turbo' | 'all'
+
 export type Attribute = 'str' | 'agi' | 'int' | 'all'
 
 export interface HeroStat {

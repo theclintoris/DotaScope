@@ -21,6 +21,7 @@ import {
 import type {
   PeerPlayer,
   PlayerHero,
+  PlayerMatch,
   PlayerProfile,
   PlayerWinLoss,
   RecentMatch,
@@ -28,7 +29,16 @@ import type {
 import { useMeta } from '../context/MetaContext'
 import { TTL } from '../lib/api'
 import { useDocumentTitle, useRemote } from '../lib/hooks'
+import { mergeRecentWithTurbo, useTurboHistory } from '../lib/turboHistory'
 import { bracketWinRate } from '../lib/meta'
+import {
+  MATCH_MODE_COPY,
+  heroPoolFromRecent,
+  isPerformanceMatch,
+  matchWon,
+  passesMatchMode,
+  recordFromMatches,
+} from '../lib/matchMode'
 import {
   gameModeName,
   rankLabel,
@@ -55,7 +65,7 @@ import {
   SectionHeading,
   WinRate,
 } from '../components/ui'
-import { PerformanceReview } from '../components/PerformanceReview'
+import { PerformanceReview, TurboBenchmark } from '../components/PerformanceReview'
 
 type HeroSort = 'games' | 'winRate' | 'name'
 type ResultFilter = 'all' | 'wins' | 'losses'
@@ -75,8 +85,18 @@ export function PlayerDetailPage() {
   const meta = useMeta()
   const profile = useRemote<PlayerProfile>(validId ? `/players/${playerId}` : null, TTL.player)
   const wl = useRemote<PlayerWinLoss>(validId ? `/players/${playerId}/wl` : null, TTL.player)
+  const wlRanked = useRemote<PlayerWinLoss>(validId ? `/players/${playerId}/wl?lobby_type=7` : null, TTL.player)
   const heroes = useRemote<PlayerHero[]>(validId ? `/players/${playerId}/heroes` : null, TTL.player)
+  const heroesRanked = useRemote<PlayerHero[]>(
+    validId ? `/players/${playerId}/heroes?lobby_type=7` : null,
+    TTL.player,
+  )
+  const ranked = useRemote<PlayerMatch[]>(
+    validId ? `/players/${playerId}/matches?limit=500&lobby_type=7` : null,
+    TTL.player,
+  )
   const recent = useRemote<RecentMatch[]>(validId ? `/players/${playerId}/recentMatches` : null, TTL.player)
+  const turboHistory = useTurboHistory(validId ? Number(playerId) : null)
   const peers = useRemote<PeerPlayer[]>(validId ? `/players/${playerId}/peers` : null, TTL.player)
   useDocumentTitle(profile.data?.profile.personaname ?? 'Player')
   const [heroFilter, setHeroFilter] = useState('')
@@ -88,12 +108,10 @@ export function PlayerDetailPage() {
   const [peerSort, setPeerSort] = useState<PeerSort>('games')
   const [peerLimit, setPeerLimit] = useState(PEER_PAGE_SIZE)
 
+  const matchMode = meta.matchMode
+  const modeCopy = MATCH_MODE_COPY[matchMode]
   const heroMap = useMemo(() => new Map(meta.heroes.map((hero) => [hero.id, hero])), [meta.heroes])
   const metricMap = useMemo(() => new Map(meta.metrics.map((metric) => [metric.hero.id, metric])), [meta.metrics])
-  const playerHeroMap = useMemo(
-    () => new Map((heroes.data ?? []).map((entry) => [entry.hero_id, entry])),
-    [heroes.data],
-  )
   const rankBracket = profile.data?.rank_tier
     ? Math.min(7, Math.max(1, Math.floor(profile.data.rank_tier / 10)))
     : null
@@ -102,14 +120,66 @@ export function PlayerDetailPage() {
     : 'all-rank'
 
   const recentRows = useMemo(() => {
-    return (recent.data ?? []).map((match) => {
+    return mergeRecentWithTurbo(recent.data ?? undefined, turboHistory.rows).map((match) => {
       const radiant = match.player_slot < 128
-      return { ...match, radiant, won: radiant === match.radiant_win }
+      return { ...match, radiant, won: matchWon(match) }
     })
-  }, [recent.data])
+  }, [recent.data, turboHistory.rows])
+
+  const rankedRows = useMemo(() => {
+    return (ranked.data ?? []).map((match) => {
+      const radiant = match.player_slot < 128
+      return { ...match, radiant, won: matchWon(match) }
+    })
+  }, [ranked.data])
+
+  const turboRows = useMemo(
+    () => recentRows.filter((match) => passesMatchMode(match, 'turbo')),
+    [recentRows],
+  )
+
+  const modeRows = useMemo(() => {
+    if (matchMode === 'ranked') return rankedRows.slice(0, 20)
+    if (matchMode === 'turbo') return turboRows
+    return recentRows
+  }, [matchMode, rankedRows, recentRows, turboRows])
+
+  const performanceRows = useMemo(() => recent.data ?? [], [recent.data])
+
+  const heroPool = useMemo(() => {
+    if (matchMode === 'ranked') return heroesRanked.data ?? []
+    if (matchMode === 'turbo') return heroPoolFromRecent(recentRows, 'turbo')
+    const base = new Map((heroes.data ?? []).map((entry) => [entry.hero_id, { ...entry }]))
+    heroPoolFromRecent(recentRows, 'turbo').forEach((entry) => {
+      const current = base.get(entry.hero_id)
+      if (!current) {
+        base.set(entry.hero_id, entry)
+        return
+      }
+      current.games += entry.games
+      current.win += entry.win
+      current.last_played = Math.max(current.last_played, entry.last_played)
+    })
+    return [...base.values()]
+  }, [matchMode, heroes.data, heroesRanked.data, recentRows])
+
+  const heroPoolLoading =
+    matchMode === 'ranked' ? heroesRanked.loading : recent.loading || heroes.loading
+  const heroPoolError =
+    matchMode === 'ranked' ? heroesRanked.error : recent.error ?? heroes.error
+  const heroPoolRefresh =
+    matchMode === 'ranked' ? heroesRanked.refresh : () => {
+      recent.refresh()
+      heroes.refresh()
+    }
+
+  const playerHeroMap = useMemo(
+    () => new Map(heroPool.map((entry) => [entry.hero_id, entry])),
+    [heroPool],
+  )
 
   const recentForm = useMemo(() => {
-    const rows = recentRows.slice(0, 10)
+    const rows = modeRows.slice(0, 10)
     const won = rows.filter((match) => match.won).length
     let streak = 0
     let streakType: 'W' | 'L' | null = null
@@ -122,14 +192,12 @@ export function PlayerDetailPage() {
         streak += 1
       } else break
     }
-    const avgGpm = rows.length ? rows.reduce((sum, match) => sum + match.gold_per_min, 0) / rows.length : 0
-    const avgXpm = rows.length ? rows.reduce((sum, match) => sum + match.xp_per_min, 0) / rows.length : 0
-    return { rows, won, winRate: rows.length ? won / rows.length : null, streak, streakType, avgGpm, avgXpm }
-  }, [recentRows])
+    return { rows, won, winRate: rows.length ? won / rows.length : null, streak, streakType }
+  }, [modeRows])
 
   const heroRows = useMemo(() => {
     const query = heroFilter.trim().toLowerCase()
-    const rows = (heroes.data ?? [])
+    const rows = heroPool
       .map((entry) => ({ ...entry, hero: heroMap.get(entry.hero_id) }))
       .filter((entry) => entry.hero && entry.games >= minGames)
       .filter((entry) => !query || entry.hero!.localized_name.toLowerCase().includes(query))
@@ -140,11 +208,11 @@ export function PlayerDetailPage() {
       }
       return b.games - a.games
     })
-  }, [heroes.data, heroMap, heroFilter, minGames, heroSort])
+  }, [heroPool, heroMap, heroFilter, minGames, heroSort])
 
   const matchRows = useMemo(() => {
     const query = matchHeroFilter.trim().toLowerCase()
-    return recentRows.filter((match) => {
+    return modeRows.filter((match) => {
       if (resultFilter === 'wins' && !match.won) return false
       if (resultFilter === 'losses' && match.won) return false
       if (query) {
@@ -153,7 +221,13 @@ export function PlayerDetailPage() {
       }
       return true
     })
-  }, [recentRows, resultFilter, matchHeroFilter, heroMap])
+  }, [modeRows, resultFilter, matchHeroFilter, heroMap])
+
+  const hasPerformanceColumns = matchRows.some(isPerformanceMatch)
+  const logLoading = matchMode === 'ranked' ? ranked.loading : recent.loading
+  const logError = matchMode === 'ranked' ? ranked.error : recent.error
+  const logRefresh = matchMode === 'ranked' ? ranked.refresh : recent.refresh
+  const laneRows = recentRows.filter((match) => passesMatchMode(match, matchMode))
 
   const peerRows = useMemo(() => {
     const rows = (peers.data ?? []).filter((peer) => peer.with_games > 0)
@@ -167,7 +241,7 @@ export function PlayerDetailPage() {
 
   const attributeMix = useMemo(() => {
     const buckets = new Map<string, { games: number; wins: number }>()
-    ;(heroes.data ?? []).forEach((entry) => {
+    heroPool.forEach((entry) => {
       const hero = heroMap.get(entry.hero_id)
       if (!hero) return
       const current = buckets.get(hero.primary_attr) ?? { games: 0, wins: 0 }
@@ -179,11 +253,11 @@ export function PlayerDetailPage() {
     return [...buckets.entries()]
       .map(([attr, bucket]) => ({ attr, ...bucket, share: total ? bucket.games / total : 0 }))
       .sort((a, b) => b.games - a.games)
-  }, [heroes.data, heroMap])
+  }, [heroPool, heroMap])
 
   const laneMix = useMemo(() => {
     const counts = new Map<number, number>()
-    recentRows.forEach((match) => {
+    laneRows.forEach((match) => {
       if (match.lane_role == null || !LANE_LABELS[match.lane_role]) return
       counts.set(match.lane_role, (counts.get(match.lane_role) ?? 0) + 1)
     })
@@ -191,7 +265,7 @@ export function PlayerDetailPage() {
     return [...counts.entries()]
       .map(([lane, count]) => ({ lane, count, share: total ? count / total : 0 }))
       .sort((a, b) => b.count - a.count)
-  }, [recentRows])
+  }, [laneRows])
 
   if (!validId) {
     return (
@@ -225,10 +299,29 @@ export function PlayerDetailPage() {
   }
 
   const player = profile.data.profile
-  const wins = wl.data?.win ?? null
-  const losses = wl.data?.lose ?? null
+  const record = matchMode === 'ranked'
+    ? wlRanked.data
+    : matchMode === 'turbo'
+      ? recordFromMatches(recentRows, 'turbo')
+      : wl.data
+  const wins = record?.win ?? null
+  const losses = record?.lose ?? null
   const totalGames = wins != null && losses != null ? wins + losses : null
   const careerWinRate = totalGames ? (wins ?? 0) / totalGames : null
+  const recordLabel = matchMode === 'ranked' ? 'Ranked' : matchMode === 'turbo' ? 'Turbo' : 'Career'
+  const recordNote = matchMode === 'ranked'
+    ? 'OpenDota ranked career record'
+    : matchMode === 'turbo'
+      ? turboHistory.available
+        ? 'OpenDota sample + parsed Turbo history'
+        : 'From the latest 20-match sample'
+      : 'OpenDota career record'
+  const recordLoading = matchMode === 'ranked'
+    ? wlRanked.loading && !wlRanked.data
+    : matchMode === 'turbo'
+      ? false
+      : wl.loading && !wl.data
+  const recordError = matchMode === 'ranked' ? wlRanked.error : matchMode === 'turbo' ? null : wl.error
   const rank = rankLabel(profile.data.rank_tier)
   const lastLogin = player.last_login ? timeAgoFromIso(player.last_login) : 'Unknown'
 
@@ -269,7 +362,7 @@ export function PlayerDetailPage() {
           </div>
         </div>
         <div className="player-form-card">
-          <span className="eyebrow">Last 10</span>
+          <span className="eyebrow">{modeCopy.short} · Last 10</span>
           <div className="form-pips">
             {recentForm.rows.map((match) => (
               <span
@@ -291,23 +384,23 @@ export function PlayerDetailPage() {
 
       <div className="kpi-grid">
         <div className="kpi-card">
-          <div className="kpi-top"><span className="kpi-label">Career games</span><History size={16} className="kpi-icon" /></div>
+          <div className="kpi-top"><span className="kpi-label">{recordLabel} games</span><History size={16} className="kpi-icon" /></div>
           <div className="kpi-value">{totalGames != null ? formatNumber(totalGames) : '—'}</div>
           <div className="kpi-foot">
             <span>
               {wins != null && losses != null
                 ? `${formatNumber(wins)} wins · ${formatNumber(losses)} losses`
-                : 'career record unavailable'}
+                : 'record unavailable'}
             </span>
           </div>
         </div>
         <div className="kpi-card">
-          <div className="kpi-top"><span className="kpi-label">Career win rate</span><Target size={16} className="kpi-icon" /></div>
+          <div className="kpi-top"><span className="kpi-label">{recordLabel} win rate</span><Target size={16} className="kpi-icon" /></div>
           <div className={classNames('kpi-value', careerWinRate != null && careerWinRate >= 0.5 ? 'text-good' : 'text-bad')}>
             {careerWinRate != null ? formatPercent(careerWinRate) : '—'}
           </div>
           <div className="kpi-foot">
-            <span>{totalGames != null ? `across ${formatNumber(totalGames)} recorded games` : 'career record unavailable'}</span>
+            <span>{totalGames != null ? `${recordNote} · ${formatNumber(totalGames)} games` : 'record unavailable'}</span>
           </div>
         </div>
         <div className="kpi-card">
@@ -318,11 +411,15 @@ export function PlayerDetailPage() {
         <div className="kpi-card kpi-accent">
           <div className="kpi-top"><span className="kpi-label">Recent form</span><Swords size={16} className="kpi-icon" /></div>
           <div className="kpi-value">{recentForm.winRate != null ? formatPercent(recentForm.winRate) : '—'}</div>
-          <div className="kpi-foot"><span>{recentForm.rows.length} match sample · {recentForm.won} wins</span></div>
+          <div className="kpi-foot"><span>{recentForm.rows.length} {modeCopy.short} matches · {recentForm.won} wins</span></div>
         </div>
       </div>
 
-      <PerformanceReview matches={recent.data ?? []} />
+      {matchMode === 'turbo' ? (
+        <TurboBenchmark matches={turboRows} />
+      ) : (
+        <PerformanceReview matches={performanceRows} />
+      )}
 
       <div className="detail-layout">
         <div className="detail-main">
@@ -330,7 +427,7 @@ export function PlayerDetailPage() {
             <SectionHeading
               eyebrow="Hero pool"
               title="Comfort picks"
-              hint={`${formatNumber(heroes.data?.length ?? 0)} heroes played`}
+              hint={`${formatNumber(heroRows.length)} heroes · ${modeCopy.label}`}
             />
             <div className="filter-bar compact hero-pool-filters">
               <label className="search-field">
@@ -361,10 +458,10 @@ export function PlayerDetailPage() {
               </label>
             </div>
 
-            {heroes.loading && !heroes.data ? (
+            {heroPoolLoading && !heroPool.length ? (
               <div className="mini-skeletons">{[0, 1, 2, 3, 4].map((key) => <span className="skeleton" key={key} style={{ height: 40 }} />)}</div>
-            ) : heroes.error && !heroes.data ? (
-              <ErrorState error={heroes.error} onRetry={heroes.refresh} title="Hero pool unavailable" />
+            ) : heroPoolError && !heroPool.length ? (
+              <ErrorState error={heroPoolError} onRetry={heroPoolRefresh} title="Hero pool unavailable" />
             ) : heroRows.length === 0 ? (
               <EmptyState title="No heroes match these filters" icon={<Crosshair size={20} />}>
                 Lower the minimum game threshold or clear the hero search.
@@ -432,8 +529,12 @@ export function PlayerDetailPage() {
               </div>
             )}
             <p className="panel-footnote">
-              Hero grades follow the current meta lens. The +/− compares this player's hero win rate with
-              OpenDota's {bracketLabel} baseline; hover for the exact rates and sample.
+              {matchMode === 'ranked'
+                ? 'Ranked career aggregates from OpenDota.'
+                : matchMode === 'turbo'
+                  ? 'Turbo aggregate is a sample from the latest 20 public matches; OpenDota does not expose a Turbo career split.'
+                  : 'Ranked career aggregates plus the latest mixed Turbo sample.'}
+              {' '}Hero grades follow the current meta lens; +/− compares win rate with the {bracketLabel} baseline.
             </p>
           </section>
 
@@ -507,7 +608,7 @@ export function PlayerDetailPage() {
             <SectionHeading
               eyebrow="Recent matches"
               title="Form log"
-              hint={`${formatNumber(matchRows.length)} shown`}
+              hint={`${formatNumber(matchRows.length)} shown · ${modeCopy.label}`}
               action={
                 <div className="segmented segmented-sm">
                   {(['all', 'wins', 'losses'] as ResultFilter[]).map((value) => (
@@ -527,13 +628,19 @@ export function PlayerDetailPage() {
                   placeholder="Filter by hero…"
                 />
               </label>
-              <span className="muted-label"><Clock3 size={13} /> OpenDota returns the latest 20 parsed matches</span>
+              <span className="muted-label">
+                <Clock3 size={13} /> {matchMode === 'ranked'
+                  ? 'Ranked · latest 20 shown'
+                  : matchMode === 'turbo'
+                    ? 'Turbo sample · latest 20 matches'
+                    : 'OpenDota latest mixed sample'}
+              </span>
             </div>
 
-            {recent.loading && !recent.data ? (
+            {logLoading && !modeRows.length ? (
               <div className="mini-skeletons">{[0, 1, 2, 3, 4].map((key) => <span className="skeleton" key={key} style={{ height: 44 }} />)}</div>
-            ) : recent.error && !recent.data ? (
-              <ErrorState error={recent.error} onRetry={recent.refresh} title="Recent matches unavailable" />
+            ) : logError && !modeRows.length ? (
+              <ErrorState error={logError} onRetry={logRefresh} title="Recent matches unavailable" />
             ) : matchRows.length === 0 ? (
               <EmptyState title="No matches in this slice" icon={<Swords size={20} />}>
                 Clear the result or hero filter to see the full recent log.
@@ -546,9 +653,9 @@ export function PlayerDetailPage() {
                       <th>Result</th>
                       <th>Hero</th>
                       <th>K / D / A</th>
-                      <th className="num">GPM / XPM</th>
-                      <th className="num">LH / DN</th>
-                      <th className="num">Hero dmg</th>
+                      {hasPerformanceColumns && <th className="num">GPM / XPM</th>}
+                      {hasPerformanceColumns && <th className="num">LH / DN</th>}
+                      {hasPerformanceColumns && <th className="num">Hero dmg</th>}
                       <th>Mode</th>
                       <th className="num">Length</th>
                       <th className="num">When</th>
@@ -594,9 +701,19 @@ export function PlayerDetailPage() {
                             </Link>
                           </td>
                           <td className="mono">{match.kills} / {match.deaths} / {match.assists}</td>
-                          <td className="num mono">{match.gold_per_min} / {match.xp_per_min}</td>
-                          <td className="num mono">{match.last_hits} / {match.denies ?? 0}</td>
-                          <td className="num mono">{formatCompact(match.hero_damage)}</td>
+                          {hasPerformanceColumns && (
+                            <>
+                              <td className="num mono">
+                                {isPerformanceMatch(match) ? `${match.gold_per_min} / ${match.xp_per_min}` : '—'}
+                              </td>
+                              <td className="num mono">
+                                {isPerformanceMatch(match) ? `${match.last_hits} / ${match.denies ?? 0}` : '—'}
+                              </td>
+                              <td className="num mono">
+                                {isPerformanceMatch(match) ? formatCompact(match.hero_damage) : '—'}
+                              </td>
+                            </>
+                          )}
                           <td className="muted-label">{gameModeName(match.game_mode)}</td>
                           <td className="num mono">{formatDuration(match.duration)}</td>
                           <td className="num muted-label">{formatUnixTime(match.start_time)}</td>
@@ -617,11 +734,11 @@ export function PlayerDetailPage() {
 
         <div className="detail-side">
           <section className="panel">
-            <SectionHeading eyebrow="Career record" title="Win / loss" />
-            {wl.loading && !wl.data ? (
+            <SectionHeading eyebrow={`${recordLabel} record`} title="Win / loss" />
+            {recordLoading ? (
               <span className="skeleton" style={{ height: 84 }} />
-            ) : wl.error && !wl.data ? (
-              <ErrorState error={wl.error} onRetry={wl.refresh} title="Record unavailable" />
+            ) : recordError ? (
+              <ErrorState error={recordError} onRetry={matchMode === 'ranked' ? wlRanked.refresh : wl.refresh} title="Record unavailable" />
             ) : (
               <>
                 <div className="wl-numbers">
@@ -678,7 +795,10 @@ export function PlayerDetailPage() {
             ) : (
               <span className="muted-copy">Lane data is missing from the recent matches.</span>
             )}
-            <p className="panel-footnote">Derived from OpenDota lane_role in the latest 20 matches.</p>
+            <p className="panel-footnote">
+              Derived from OpenDota lane_role in the latest mixed 20-match feed
+              {matchMode !== 'all' ? ` · ${modeCopy.label} rows only` : ''}.
+            </p>
           </section>
 
           <section className="panel">

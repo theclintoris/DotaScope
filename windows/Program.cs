@@ -330,7 +330,7 @@ internal sealed class MainForm : Form
                     new MemoryStream(json),
                     200,
                     "OK",
-                    "Content-Type: application/json; charset=utf-8\r\nCache-Control: no-store");
+                    "Content-Type: application/json; charset=utf-8" + (char)13 + (char)10 + "Cache-Control: no-store");
             };
 
             core.NewWindowRequested += (_, args) =>

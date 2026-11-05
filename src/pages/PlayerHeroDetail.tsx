@@ -21,10 +21,19 @@ import type {
   PlayerMatch,
   PlayerProfile,
   PlayerWinLoss,
+  RecentMatch,
 } from '../types'
 import { useMeta } from '../context/MetaContext'
 import { fetchMatch, TTL } from '../lib/api'
 import { useDocumentTitle, useRemote } from '../lib/hooks'
+import { mergeRecentWithTurbo, useTurboHistory } from '../lib/turboHistory'
+import {
+  MATCH_MODE_COPY,
+  heroPoolFromRecent,
+  matchWon,
+  recordFromMatches,
+  type MatchSummary,
+} from '../lib/matchMode'
 import {
   ATTR_MAP,
   gameModeName,
@@ -55,7 +64,7 @@ const PAGE_SIZE = 25
 type ResultFilter = 'all' | 'wins' | 'losses'
 
 type BuildRow = {
-  summary: PlayerMatch
+  summary: MatchSummary
   detail: MatchDetail
   me: MatchPlayer
   won: boolean
@@ -67,9 +76,28 @@ export function PlayerHeroDetailPage() {
   const heroNumber = Number(heroId)
   const validHero = Number.isInteger(heroNumber) && heroNumber > 0
   const meta = useMeta()
+  const matchMode = meta.matchMode
+  const modeCopy = MATCH_MODE_COPY[matchMode]
   const profile = useRemote<PlayerProfile>(validPlayer ? `/players/${playerId}` : null, TTL.player)
   const wl = useRemote<PlayerWinLoss>(validPlayer ? `/players/${playerId}/wl` : null, TTL.player)
+  const wlRanked = useRemote<PlayerWinLoss>(
+    validPlayer ? `/players/${playerId}/wl?lobby_type=7` : null,
+    TTL.player,
+  )
   const playerHeroes = useRemote<PlayerHero[]>(validPlayer ? `/players/${playerId}/heroes` : null, TTL.player)
+  const rankedHeroes = useRemote<PlayerHero[]>(
+    validPlayer ? `/players/${playerId}/heroes?lobby_type=7` : null,
+    TTL.player,
+  )
+  const recent = useRemote<RecentMatch[]>(
+    validPlayer ? `/players/${playerId}/recentMatches` : null,
+    TTL.player,
+  )
+  const turboHistory = useTurboHistory(validPlayer ? Number(playerId) : null)
+  const allRecent = useMemo(
+    () => mergeRecentWithTurbo(recent.data ?? undefined, turboHistory.rows),
+    [recent.data, turboHistory.rows],
+  )
   const history = useRemote<PlayerMatch[]>(
     validPlayer && validHero
       ? `/players/${playerId}/matches?hero_id=${heroNumber}&limit=${HISTORY_LIMIT}`
@@ -82,19 +110,44 @@ export function PlayerHeroDetailPage() {
     () => meta.heroes.find((entry) => entry.id === heroNumber),
     [meta.heroes, heroNumber],
   )
-  const aggregate = useMemo(
-    () => playerHeroes.data?.find((entry) => entry.hero_id === heroNumber),
-    [playerHeroes.data, heroNumber],
+  const turboHeroRows = useMemo(
+    () => allRecent.filter((entry) => entry.hero_id === heroNumber && entry.game_mode === 23),
+    [allRecent, heroNumber],
   )
+  const aggregate = useMemo(() => {
+    if (matchMode === 'turbo') {
+      return heroPoolFromRecent(turboHeroRows, 'turbo')[0]
+    }
+    const base = matchMode === 'ranked'
+      ? rankedHeroes.data?.find((entry) => entry.hero_id === heroNumber)
+      : playerHeroes.data?.find((entry) => entry.hero_id === heroNumber)
+    if (matchMode === 'ranked') return base
+    const turbo = heroPoolFromRecent(turboHeroRows, 'turbo')[0]
+    if (!base) return turbo
+    if (!turbo) return base
+    return {
+      ...base,
+      games: base.games + turbo.games,
+      win: base.win + turbo.win,
+      last_played: Math.max(base.last_played, turbo.last_played),
+    }
+  }, [matchMode, playerHeroes.data, rankedHeroes.data, turboHeroRows, heroNumber])
   const player = profile.data?.profile
   const rankTier = profile.data?.rank_tier ?? null
   const rank = rankTier ? rankLabel(rankTier) : 'Unranked'
 
-  const rows = useMemo(
-    () =>
-      [...(history.data ?? [])].sort((a, b) => b.start_time - a.start_time),
-    [history.data],
-  )
+  const rows = useMemo(() => {
+    const regular = history.data ?? []
+    const rankedHistory = regular.filter((entry) => entry.lobby_type === 7)
+    const source = matchMode === 'ranked'
+      ? rankedHistory
+      : matchMode === 'turbo'
+        ? turboHeroRows
+        : [...regular, ...turboHeroRows]
+    const unique = new Map<number, MatchSummary>()
+    source.forEach((entry) => unique.set(entry.match_id, entry))
+    return [...unique.values()].sort((a, b) => b.start_time - a.start_time)
+  }, [history.data, matchMode, turboHeroRows])
   const enrichedRows = useMemo(() => rows.slice(0, BUILD_SAMPLE), [rows])
   const detailKey = useMemo(
     () => enrichedRows.map((entry) => entry.match_id).join(','),
@@ -105,6 +158,11 @@ export function PlayerHeroDetailPage() {
   const [buildsError, setBuildsError] = useState<string | null>(null)
   const [historyLimit, setHistoryLimit] = useState(PAGE_SIZE)
   const [resultFilter, setResultFilter] = useState<ResultFilter>('all')
+
+  useEffect(() => {
+    setHistoryLimit(PAGE_SIZE)
+    setResultFilter('all')
+  }, [matchMode, heroNumber, playerId])
 
   useEffect(() => {
     if (!enrichedRows.length) {
@@ -171,38 +229,51 @@ export function PlayerHeroDetailPage() {
 
   const stats = useMemo(() => {
     const games = aggregate?.games ?? rows.length
-    const wins = aggregate?.win ?? rows.filter((entry) => (entry.player_slot < 128) === entry.radiant_win).length
+    const wins = aggregate?.win ?? rows.filter(matchWon).length
     const heroWinRate = games ? wins / games : null
-    const recent = rows.slice(0, 10)
-    const recentWins = recent.filter((entry) => (entry.player_slot < 128) === entry.radiant_win).length
-    const avgKda = recent.length
-      ? recent.reduce((sum, entry) => sum + (entry.kills + entry.assists) / Math.max(entry.deaths, 1), 0) / recent.length
+    const recentGames = rows.slice(0, 10)
+    const recentWins = recentGames.filter(matchWon).length
+    const avgKda = recentGames.length
+      ? recentGames.reduce((sum, entry) => sum + (entry.kills + entry.assists) / Math.max(entry.deaths, 1), 0) / recentGames.length
       : null
-    const avgDuration = recent.length
-      ? recent.reduce((sum, entry) => sum + entry.duration, 0) / recent.length
+    const avgDuration = recentGames.length
+      ? recentGames.reduce((sum, entry) => sum + entry.duration, 0) / recentGames.length
       : null
-    const partyGames = recent.filter((entry) => (entry.party_size ?? 1) > 1).length
-    const careerGames = (wl.data?.win ?? 0) + (wl.data?.lose ?? 0)
-    const careerWinRate = careerGames ? (wl.data?.win ?? 0) / careerGames : null
+    const partyGames = recentGames.filter((entry) => (entry.party_size ?? 1) > 1).length
+    const record = matchMode === 'ranked'
+      ? wlRanked.data
+      : matchMode === 'turbo'
+        ? recordFromMatches(allRecent, 'turbo')
+        : wl.data
+    const careerGames = (record?.win ?? 0) + (record?.lose ?? 0)
+    const careerWinRate = careerGames ? (record?.win ?? 0) / careerGames : null
     const delta = heroWinRate != null && careerWinRate != null ? heroWinRate - careerWinRate : null
     return {
       games,
       wins,
       heroWinRate,
-      recent,
+      recent: recentGames,
       recentWins,
-      recentWinRate: recent.length ? recentWins / recent.length : null,
+      recentWinRate: recentGames.length ? recentWins / recentGames.length : null,
       avgKda,
       avgDuration,
-      partyShare: recent.length ? partyGames / recent.length : 0,
+      partyShare: recentGames.length ? partyGames / recentGames.length : 0,
       careerWinRate,
       delta,
-      lastPlayed: aggregate?.last_played,
+      lastPlayed: aggregate?.last_played ?? rows[0]?.start_time,
     }
-  }, [aggregate, rows, wl.data])
+  }, [aggregate, rows, allRecent, wl.data, wlRanked.data, matchMode])
+
+  const historyLoading = matchMode === 'turbo'
+    ? recent.loading && !recent.data
+    : history.loading && !history.data
+  const historyError = matchMode === 'turbo'
+    ? recent.error
+    : history.error
+  const historyRefresh = matchMode === 'turbo' ? recent.refresh : history.refresh
 
   const formPips = stats.recent.map((entry) => ({
-    won: (entry.player_slot < 128) === entry.radiant_win,
+    won: matchWon(entry),
     id: entry.match_id,
   }))
 
@@ -348,7 +419,7 @@ export function PlayerHeroDetailPage() {
 
       <div className="kpi-grid">
         <KpiCard label="Games on hero" value={formatNumber(stats.games)} icon={<Crosshair size={16} />} foot={`${formatNumber(stats.wins)} wins`} />
-        <KpiCard label="Hero win rate" value={stats.heroWinRate != null ? formatPercent(stats.heroWinRate) : '—'} icon={<TrendingUp size={16} />} foot={stats.delta != null ? `${stats.delta >= 0 ? '+' : ''}${(stats.delta * 100).toFixed(1)} pts vs career` : 'career comparison unavailable'} tone={stats.delta != null && stats.delta > 0.02 ? 'good' : stats.delta != null && stats.delta < -0.02 ? 'bad' : 'default'} />
+        <KpiCard label="Hero win rate" value={stats.heroWinRate != null ? formatPercent(stats.heroWinRate) : '—'} icon={<TrendingUp size={16} />} foot={stats.delta != null ? `${stats.delta >= 0 ? '+' : ''}${(stats.delta * 100).toFixed(1)} pts vs ${matchMode === 'ranked' ? 'ranked' : matchMode === 'turbo' ? 'Turbo sample' : 'career'}` : `${matchMode === 'ranked' ? 'Ranked' : matchMode === 'turbo' ? 'Turbo sample' : 'Career'} comparison unavailable`} tone={stats.delta != null && stats.delta > 0.02 ? 'good' : stats.delta != null && stats.delta < -0.02 ? 'bad' : 'default'} />
         <KpiCard label="Last 10 games" value={stats.recentWinRate != null ? formatPercent(stats.recentWinRate) : '—'} icon={<Swords size={16} />} foot={`${stats.recentWins}-${stats.recent.length - stats.recentWins} record`} />
         <KpiCard label="Average KDA" value={stats.avgKda != null ? stats.avgKda.toFixed(2) : '—'} icon={<Target size={16} />} foot="latest 10 matches" tone="accent" />
       </div>
@@ -359,7 +430,7 @@ export function PlayerHeroDetailPage() {
             <SectionHeading
               eyebrow="Performance"
               title="Recent form"
-              hint={`${formatNumber(rows.length)} public matches loaded`}
+              hint={`${formatNumber(rows.length)} ${modeCopy.short} matches loaded`}
             />
             <div className="ph-form-pips">
               <div className="form-pips">
@@ -368,7 +439,7 @@ export function PlayerHeroDetailPage() {
                 ))}
                 {!formPips.length && <span className="muted-copy">No recent matches returned.</span>}
               </div>
-              <span className="muted-label"><Clock3 size={13} /> Latest 10 games</span>
+              <span className="muted-label"><Clock3 size={13} /> Latest 10 {modeCopy.short.toLowerCase()} games</span>
             </div>
             <div className="ph-stat-grid">
               <div><span>Record</span><strong>{formatNumber(stats.wins)}–{formatNumber(stats.games - stats.wins)}</strong></div>
@@ -377,7 +448,11 @@ export function PlayerHeroDetailPage() {
               <div><span>Last played</span><strong>{stats.lastPlayed ? formatUnixTime(stats.lastPlayed) : '—'}</strong></div>
             </div>
             <p className="panel-footnote">
-              Hero totals come from OpenDota's parsed public match archive; recent form is the latest ten returned games.
+              {matchMode === 'ranked'
+                ? 'Ranked career hero totals and the latest ten ranked games from OpenDota.'
+                : matchMode === 'turbo'
+                  ? 'Turbo sample only: OpenDota exposes Turbo games in the latest 20-match feed.'
+                  : 'OpenDota ranked hero history plus the latest Turbo sample.'}
             </p>
           </section>
 
@@ -451,10 +526,10 @@ export function PlayerHeroDetailPage() {
                 </div>
               }
             />
-            {history.loading && !history.data ? (
+            {historyLoading ? (
               <div className="mini-skeletons">{[0, 1, 2, 3, 4].map((key) => <span key={key} className="skeleton" style={{ height: 44 }} />)}</div>
-            ) : history.error && !history.data ? (
-              <ErrorState error={history.error} onRetry={history.refresh} title="History unavailable" />
+            ) : historyError && !rows.length ? (
+              <ErrorState error={historyError} onRetry={historyRefresh} title="History unavailable" />
             ) : !filteredHistory.length ? (
               <EmptyState title="No matches in this slice" icon={<Swords size={20} />}>
                 Change the result filter or open a different hero.
@@ -555,8 +630,8 @@ export function PlayerHeroDetailPage() {
               <span>{formatNumber(stats.games)} games</span>
             </div>
             <div className="fact-list">
-              <div><span>Career win rate</span><strong>{stats.careerWinRate != null ? formatPercent(stats.careerWinRate) : '—'}</strong></div>
-              <div><span>Delta vs career</span><strong className={stats.delta == null ? '' : stats.delta >= 0 ? 'text-good' : 'text-bad'}>{stats.delta != null ? `${stats.delta >= 0 ? '+' : ''}${(stats.delta * 100).toFixed(1)} pts` : '—'}</strong></div>
+              <div><span>{matchMode === 'ranked' ? 'Ranked career win rate' : matchMode === 'turbo' ? 'Turbo sample win rate' : 'Career win rate'}</span><strong>{stats.careerWinRate != null ? formatPercent(stats.careerWinRate) : '—'}</strong></div>
+              <div><span>Delta vs {matchMode === 'ranked' ? 'ranked' : matchMode === 'turbo' ? 'sample' : 'career'}</span><strong className={stats.delta == null ? '' : stats.delta >= 0 ? 'text-good' : 'text-bad'}>{stats.delta != null ? `${stats.delta >= 0 ? '+' : ''}${(stats.delta * 100).toFixed(1)} pts` : '—'}</strong></div>
               <div><span>Last played</span><strong>{stats.lastPlayed ? formatUnixTime(stats.lastPlayed) : '—'}</strong></div>
             </div>
           </section>
@@ -564,13 +639,14 @@ export function PlayerHeroDetailPage() {
           <section className="panel">
             <SectionHeading eyebrow="Sample" title="What's included" />
             <div className="fact-list">
-              <div><span>Aggregate</span><strong>OpenDota parsed</strong></div>
+              <div><span>Aggregate</span><strong>{matchMode === 'ranked' ? 'Ranked career' : matchMode === 'turbo' ? 'Latest 20 Turbo' : 'Career + Turbo sample'}</strong></div>
               <div><span>History</span><strong>{formatNumber(rows.length)} rows</strong></div>
               <div><span>Build sample</span><strong>{buildRows.length} maps</strong></div>
               <div><span>Rank context</span><strong>{rank}</strong></div>
             </div>
             <p className="panel-footnote">
               OpenDota only exposes parsed public games. Private, unparsed and some archived matches are omitted.
+              {matchMode === 'turbo' ? ' Turbo history is limited to the latest 20-match sample.' : ''}
             </p>
           </section>
 

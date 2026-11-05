@@ -32,6 +32,7 @@ windows/obj/
 windows/bundle-temp/
 windows/data/
 windows/data-*/
+worker/data/
 windows/web.zip
 windows/startup.log
 windows/DotaScope-app.exe

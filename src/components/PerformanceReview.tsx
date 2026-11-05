@@ -415,3 +415,217 @@ export function PerformanceReview({ matches }: { matches: RecentMatch[] }) {
     </section>
   )
 }
+
+export function TurboBenchmark({ matches }: { matches: RecentMatch[] }) {
+  const sample = useMemo(
+    () =>
+      matches
+        .filter((match) => match.game_mode === 23 && match.duration > 300)
+        .sort((a, b) => b.start_time - a.start_time),
+    [matches],
+  )
+  const latest = useMemo(() => sample.slice(0, 5), [sample])
+  const baseline = useMemo(() => sample.slice(5), [sample])
+
+  const metricStats = useMemo(() => {
+    return METRICS.map((metric) => {
+      const latestValue = median(latest.map(metric.raw))
+      const baselineValue = median((baseline.length ? baseline : sample).map(metric.raw))
+      const delta =
+        latestValue != null && baselineValue != null && baselineValue !== 0
+          ? (metric.better === 'low' ? baselineValue - latestValue : latestValue - baselineValue) / Math.abs(baselineValue)
+          : null
+      const score =
+        delta == null
+          ? null
+          : Math.max(1, Math.min(99, Math.round(50 + delta * 100)))
+      return {
+        ...metric,
+        latest: latestValue,
+        baseline: baselineValue,
+        score,
+      }
+    })
+  }, [baseline, latest, sample])
+
+  const overall = median(
+    metricStats
+      .map((metric) => metric.score)
+      .filter((value): value is number => value != null),
+  )
+  const strongest = metricStats
+    .filter((metric) => metric.score != null)
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0]
+  const wins = latest.filter((match) => match.player_slot < 128 === match.radiant_win).length
+
+  if (sample.length < 6) {
+    return (
+      <section className="panel mode-note-panel">
+        <SectionHeading eyebrow="Turbo benchmark" title="Build the sample" />
+        <p className="muted-copy">
+          Turbo benchmarks need at least six parsed Turbo games. DotaScope will keep adding games to your
+          local history as you play with the desktop app open.
+        </p>
+      </section>
+    )
+  }
+
+  const flags: ReviewFlag[] = []
+  const farm = metricStats.find((metric) => metric.key === 'gold_per_min')
+  const impact = metricStats.find((metric) => metric.key === 'hero_damage_per_min')
+  const deaths = metricStats.find((metric) => metric.key === 'deaths_per_min')
+  const deathValue = deaths?.latest
+  const deathBaseline = deaths?.baseline
+
+  if (farm?.score != null && impact?.score != null && farm.score >= 62 && impact.score <= 42) {
+    flags.push({
+      title: 'Farm is up, impact is flat',
+      detail: 'Your recent Turbo farm is ahead of baseline while hero damage is below it. Check whether the extra gold is reaching fights.',
+      matchId: latest[0]?.match_id ?? 0,
+      tone: 'info',
+      icon: <Gauge size={16} />,
+    })
+  }
+  if (deathValue != null && deathBaseline != null && deathValue > deathBaseline * 1.2) {
+    flags.push({
+      title: 'Deaths above your baseline',
+      detail: `You are dying ${(deathValue / deathBaseline).toFixed(1)}× more often than your Turbo baseline. Look at the first two deaths in the latest games.`,
+      matchId: latest[0]?.match_id ?? 0,
+      tone: 'warn',
+      icon: <Skull size={16} />,
+    })
+  }
+  const longLosses = latest.filter(
+    (match) => !(match.player_slot < 128 === match.radiant_win) && match.duration >= 2400,
+  )
+  if (longLosses.length >= 2) {
+    flags.push({
+      title: 'Late Turbo games slipping',
+      detail: `${longLosses.length} of your last five Turbo games were 40+ minute losses. Review late-game buyback and objective timing.`,
+      matchId: longLosses[0].match_id,
+      tone: 'warn',
+      icon: <Clock3 size={16} />,
+    })
+  }
+
+  return (
+    <section className="performance-review">
+      <SectionHeading
+        eyebrow="Turbo benchmark"
+        title="Turbo games, benchmarked"
+        hint={`latest 5 vs ${baseline.length || 1} earlier Turbo games`}
+        action={
+          <span className="badge badge-muted">
+            <ShieldCheck size={12} /> Personal baseline
+          </span>
+        }
+      />
+
+      <div className="review-grid">
+        <div className="panel review-panel">
+          <div className="review-score-head">
+            <div>
+              <span className="eyebrow">Form index</span>
+              <div className="review-score-number">
+                <strong className={scoreTone(overall)}>{overall != null ? Math.round(overall) : '—'}</strong>
+                <span>{scoreBand(overall)}</span>
+              </div>
+              <p>
+                Latest five Turbo games ({wins}-{latest.length - wins}) compared with your earlier Turbo history.
+              </p>
+            </div>
+            <div
+              className="review-score-orbit"
+              style={{ background: `conic-gradient(var(--accent) ${(overall ?? 0) * 3.6}deg, var(--line) 0deg)` }}
+              aria-hidden="true"
+            >
+              <span>{overall != null ? Math.round(overall) : '—'}</span>
+            </div>
+          </div>
+
+          <div className="benchmark-list">
+            {metricStats.map((metric) => (
+              <div
+                className="benchmark-row"
+                key={metric.key}
+                title={metric.baseline != null ? `Turbo baseline: ${metric.format(metric.baseline)}` : undefined}
+              >
+                <span className="benchmark-label">
+                  {metric.icon} {metric.label}
+                  <small>{metric.detail}</small>
+                </span>
+                <div className="benchmark-track" aria-hidden="true">
+                  <span
+                    className={classNames(
+                      metric.score != null && metric.score >= 60 && 'is-good',
+                      metric.score != null && metric.score <= 38 && 'is-bad',
+                    )}
+                    style={{ width: `${metric.score ?? 0}%` }}
+                  />
+                </div>
+                <strong>{metric.score != null ? Math.round(metric.score) : '—'}</strong>
+                <small className="benchmark-raw">
+                  {metric.latest != null ? metric.format(metric.latest) : '—'}
+                </small>
+              </div>
+            ))}
+          </div>
+
+          <p className="panel-footnote">
+            OpenDota has no global Turbo benchmark split. This compares your latest five parsed Turbo games with
+            your earlier Turbo history. Local parser games join the sample automatically; small samples are noisy.
+          </p>
+        </div>
+
+        <div className="panel review-panel review-flags">
+          <div className="panel-head">
+            <div>
+              <span className="eyebrow">Turbo flags</span>
+              <h2>What changed lately</h2>
+            </div>
+            <span className="badge badge-muted">{sample.length} games</span>
+          </div>
+
+          {flags.length ? (
+            <div className="review-flag-list">
+              {flags.map((flag) => (
+                <Link className="review-flag" to={`/matches/${flag.matchId}`} key={flag.title}>
+                  <span className={classNames('review-flag-icon', `is-${flag.tone}`)}>{flag.icon}</span>
+                  <span className="review-flag-copy">
+                    <strong>{flag.title}</strong>
+                    <span>{flag.detail}</span>
+                  </span>
+                  <ArrowUpRight size={14} className="review-flag-arrow" />
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="review-all-clear">
+              <ShieldCheck size={20} />
+              <strong>No repeated Turbo red flags.</strong>
+              <span>No high-confidence pattern crossed the threshold in this sample. Keep the history growing.</span>
+            </div>
+          )}
+
+          {strongest && strongest.score != null && strongest.score >= 60 ? (
+            <div className="review-strength">
+              <Sparkles size={16} />
+              <div>
+                <strong>Strongest signal: {strongest.label}</strong>
+                <span>
+                  {strongest.score} form score at {strongest.latest != null ? strongest.format(strongest.latest) : '—'}.
+                  This is the part of your Turbo game doing the most work.
+                </span>
+              </div>
+            </div>
+          ) : null}
+
+          <p className="panel-footnote">
+            Form scores are relative to your own Turbo baseline, not a global percentile. At least six parsed
+            Turbo games are required before the benchmark appears.
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}

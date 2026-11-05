@@ -13,18 +13,19 @@ DotaScope brings hero meta, matchups, professional play, player dossiers, match 
 
 ## What is included
 
-- **Meta lens** — switch between ranked pubs, pro and turbo populations, and ranked brackets 1–7. The choice is shared across every page and remembered locally.
+- **Meta lens** — switch between ranked pubs, pro, turbo and Immortal populations, and ranked brackets 1–7. A Ranked/Turbo switch in the top bar keeps player dossiers, hero history and the match explorer on the same lens; the choice is shared across every page and remembered locally.
 - **Overview** — sample size, meta leader, win-rate extremes, pick pressure, trend chart, bracket/attribute distribution and the latest pro results.
 - **Hero index** — search and filter by attribute, role, attack type and Captain's Mode eligibility; sort by win rate, pick share, picks, trend, meta grade or pro presence; export CSV. Every hero carries an S–D current-meta grade derived from win and pick strength.
 - **Hero dossier** — matchups, duration profile, item phases, bracket spread, pro pick/ban presence, daily pick history and base stats.
-- **Matches** — the latest pro and public feeds with league, team, mode, lobby, rank, duration and time filters. Direct match-ID lookup.
+- **Matches** — the latest pro and public feeds plus **My matches**, your own ranked or Turbo history from the pinned profile. Includes league, team, mode, lobby, rank, duration and time filters on the public feed, and mode-aware result/KDA cards for your games.
 - **Match detail** — gold/XP advantage chart, both scoreboards, items, KDA, GPM/XPM, last hits/denies, damage, a pick/ban draft board and a parsed **Vision & Utility** breakdown (observer/sentry wards, dewards, camps stacked, runes and stuns). Unparsed matches can be queued for replay parsing with your own OpenDota key.
 - **Players** — global OpenDota player search, numeric account shortcut, and a searchable professional directory.
-- **Player profile** — career W/L, rank, estimated MMR, recent form, hero pool, match log, lane mix and attribute comfort. Hero-pool and match-log rows show the current meta grade plus a +/− flag comparing the player's hero win rate with the OpenDota baseline for their own rank bracket.
-- **Performance review** — OpenDota hero-benchmarked percentiles for farm, experience, last hits, hero impact, teamfight and survival across the latest ranked standard games, plus linked heuristic review flags and a strongest-signal callout. Turbo and unranked games are excluded because benchmarks are standard-match distributions.
+- **Player profile** — career W/L, rank, estimated MMR, recent form, hero pool, match log, lane mix and attribute comfort, filtered by the global Ranked/Turbo lens. Hero-pool and match-log rows show the current meta grade plus a +/− flag comparing the player's hero win rate with the OpenDota baseline for their own rank bracket. Turbo uses OpenDota's latest-20 sample plus locally parsed Turbo history; the UI labels the sample source.
+- **Performance review** — OpenDota hero-benchmarked percentiles for ranked standard games, plus a personal-baseline Turbo form benchmark using parsed Turbo history. Both include linked heuristic flags and a strongest-signal callout. OpenDota has no global Turbo benchmark split, so the Turbo panel explicitly compares recent form with your own Turbo history instead of claiming a population percentile.
 - **Player hero dossier** — click any hero in a player's pool or match log for hero-specific win rate, form, KDA, final-item telemetry, recent builds and the full paginated match archive on that hero.
 - **Draft lab** — a 5v5 counter-pick board for both line-ups, with role-filtered suggestions, matchup edges, item-independent meta blends and an MMR bracket guardrail. The bracket control reweights suggestions by that rank's win/pick rates; OpenDota does not publish bracket-split head-to-head samples, which the screen states explicitly. Signed-in players can weight suggestions by their own hero pool, with personal sample size and win rate shown on each card.
-- **Live suggestions** — Windows-only Game State Integration cockpit. Reads the local Dota 2 game through a loopback-only GSI bridge and turns your hero, clock, inventory and visible draft into a small item plan: popular phase items plus curated counters for invisibility, magic burst, healing, silence, physical damage and illusions. Normal play exposes only your own inventory; enemy inventories require spectating. Web and Android explain the desktop requirement.
+- **Parser lab** — local OpenDota replay parser for Turbo and utility data. Runs on your PC, never uploads the replay; see the local parser setup below.
+- **Turbo history** — auto-parses finished Turbo games on Windows through the local OpenDota worker. OpenDota’s public recent feed caps Turbo at 20 games; locally parsed rows extend the Turbo pool, match history and benchmark sample without that cap. History grows one finished game at a time and stays on the PC.
 - **Meta escape** — underplayed and underbought options with evidence. The board surfaces below-median heroes with winning matchup samples into the current top five, plus expensive low-purchase-rate items and the escape heroes who actually buy them. Counter edges are clearly attributed to the carrier hero, not the item, because OpenDota does not publish item-specific matchups. A nested **Off-meta builds** board adds unusual final-item choices on the current meta heroes, their buy-rate lift and the heroes best positioned against them.
 - **Immortal lens** — OpenDota has no usable Immortal pub aggregate. DotaScope adds an **Immortal** population using Spectral's public weekly top-ladder sample: hero pick/win rates, matchup edges, source attribution and no medal bracket split. The global Meta lens and Meta escape both use it.
 - **Squad performance** — a player's most frequent public teammates, with games together, duo win rate, last queued and average GPM, sortable by games or win rate. This uses OpenDota's public peer history, not Steam's private friends list.
@@ -34,17 +35,30 @@ DotaScope brings hero meta, matchups, professional play, player dossiers, match 
 - **Data Lab** — a read-only OpenDota SQL editor with a table/schema browser, examples, CSV export and a hard 100-row cap.
 - **PWA shell** — install prompt, service worker, offline shell, safe-area mobile navigation, command palette (`Ctrl/⌘ K`) and responsive layouts from 390 px upward.
 
-## Live suggestions setup (Windows)
+## Turbo auto-parse setup (Windows)
 
-DotaScope reads the local game through Valve's official **Game State Integration** feed. Dota 2 exposes your hero, clock, items and the visible draft; it does not expose enemy inventories during normal play (those appear only while spectating).
+DotaScope reads the local game through Valve's official **Game State Integration** feed. There is no Live suggestions screen; GSI is used only to detect finished Turbo games so the local parser can extend your history beyond OpenDota's 20-match sample.
 
-1. Install the GSI config from the Live suggestions screen, or copy
+1. Copy
    [`public/integrations/gamestate_integration_dotascope.cfg`](public/integrations/gamestate_integration_dotascope.cfg) to
    `…\Steam\steamapps\common\dota 2 beta\game\dota\cfg\gamestate_integration\`.
 2. Keep `-gamestateintegration` in Dota 2's Steam launch options.
-3. Start DotaScope, open **Live suggestions**, then start or spectate a Dota 2 match.
+3. Start DotaScope and the local parser worker (`node worker/parser-worker.mjs`) before playing a Turbo game. DotaScope will auto-parse each finished Turbo game and append it to the local history.
 
 The bridge listens only on `127.0.0.1:53000`. It never reads game memory or touches game files beyond loading the user-installed GSI config.
+
+## Local replay parser and Turbo auto-parse
+
+The **Parser lab** runs the OpenDota parser locally so Turbo games and utility data that the public match feed omits can still be inspected. It is separate from the packaged WebView2 frontend and needs a one-time local worker setup.
+
+1. Install **Node.js 26**, **Java 21**, and **7-Zip**.
+2. The OpenDota parser jar and local JDK can live in `.toolchain/`; the worker starts the parser automatically.
+3. From the project folder run `node worker/parser-worker.mjs` and leave it running.
+4. Open **Parser lab** in DotaScope and refresh. The page lists local replays and can parse one on demand.
+
+The worker uses `127.0.0.1:5601` (and starts the Java parser on `127.0.0.1:5600`). Its data stays in `worker/data/`. Replays are read from the local Dota 2 replay folder; a finished Turbo game can be downloaded from Valve's replay URL only when OpenDota exposes one.
+
+While DotaScope is open on Windows, **auto-parse** watches the GSI post-game state. It waits for the match to settle, verifies that it was Turbo, downloads/decompresses the replay if needed, and parses it in the background. A toast reports progress, the result is available in Parser lab, and every parsed Turbo row is persisted to `worker/data/turbo-history.json` so the player pages are not limited to OpenDota's latest 20 games. This only works while both Dota 2 and the local worker are running; the cloud-free design is deliberate. See [`worker/README.md`](worker/README.md) for exact prerequisites and API details.
 
 ## Update log
 

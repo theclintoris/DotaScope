@@ -10,6 +10,7 @@ import type {
   HeroMetric,
   HeroStat,
   ImmortalSnapshot,
+  MatchMode,
   PatchInfo,
   Population,
 } from '../types'
@@ -29,6 +30,7 @@ interface MetaContextValue {
   setBracket: (value: number) => void
   population: Population
   setPopulation: (value: Population) => void
+  matchMode: MatchMode
   latestPatch: PatchInfo | null
   immortal: ImmortalSnapshot | null
 }
@@ -80,6 +82,8 @@ export function MetaProvider({ children }: { children: ReactNode }) {
         : buildHeroMetrics(heroes, population, bracket),
     [heroes, population, bracket, immortal],
   )
+  const matchMode: MatchMode =
+    population === 'ranked' ? 'ranked' : population === 'turbo' ? 'turbo' : 'all'
   const latestPatch = useMemo(() => {
     if (!patches.data?.length) return null
     return [...patches.data].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
@@ -102,6 +106,7 @@ export function MetaProvider({ children }: { children: ReactNode }) {
     setBracket,
     population,
     setPopulation,
+    matchMode,
     latestPatch,
     immortal,
   }

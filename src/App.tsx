@@ -11,8 +11,8 @@ import { PlayersPage } from './pages/Players'
 import { PlayerDetailPage } from './pages/PlayerDetail'
 import { PlayerHeroDetailPage } from './pages/PlayerHeroDetail'
 import { DraftPage } from './pages/Draft'
-import { LivePage } from './pages/Live'
 import { MetaEscapePage } from './pages/MetaEscape'
+import { ParserLabPage } from './pages/ParserLab'
 import { ProPage } from './pages/Pro'
 import { RecordsPage } from './pages/Records'
 import { DataLabPage } from './pages/DataLab'
@@ -35,8 +35,8 @@ function App() {
               <Route path="players/:playerId" element={<PlayerDetailPage />} />
               <Route path="players/:playerId/heroes/:heroId" element={<PlayerHeroDetailPage />} />
               <Route path="draft" element={<DraftPage />} />
-              <Route path="live" element={<LivePage />} />
               <Route path="meta-escape" element={<MetaEscapePage />} />
+              <Route path="parser" element={<ParserLabPage />} />
               <Route path="pro" element={<ProPage />} />
               <Route path="records" element={<RecordsPage />} />
               <Route path="data-lab" element={<DataLabPage />} />

@@ -3,6 +3,7 @@ import {
   Activity,
   BadgeCheck,
   ChevronRight,
+  Cpu,
   Crosshair,
   Database,
   Download,
@@ -12,7 +13,6 @@ import {
   Medal,
   Menu,
   MonitorDown,
-  Radio,
   RefreshCw,
   Search,
   SlidersHorizontal,
@@ -33,6 +33,7 @@ import { Brand } from './Brand'
 import { MetaLens } from './MetaLens'
 import { CommandPalette } from './CommandPalette'
 import { ApiKeyDialog } from './ApiKeyDialog'
+import { AutoParserWatcher } from './AutoParserWatcher'
 import { InstallDialog } from './InstallDialog'
 import { ProfileDialog } from './ProfileDialog'
 import { PlayerAvatar, RankBadge } from './ui'
@@ -41,22 +42,22 @@ const NAV = [
   { to: '/', label: 'Overview', icon: Activity, end: true },
   { to: '/heroes', label: 'Heroes', icon: Swords },
   { to: '/draft', label: 'Draft lab', icon: Crosshair },
-  { to: '/live', label: 'Live suggestions', icon: Radio },
   { to: '/meta-escape', label: 'Meta escape', icon: Sparkles },
   { to: '/matches', label: 'Matches', icon: LayoutDashboard },
   { to: '/players', label: 'Players', icon: Users },
   { to: '/pro', label: 'Pro scene', icon: Trophy },
   { to: '/records', label: 'Records', icon: Medal },
   { to: '/data-lab', label: 'Data lab', icon: Database },
+  { to: '/parser', label: 'Parser lab', icon: Cpu },
 ]
 
 const MORE_LINKS = [
   { to: '/draft', label: 'Draft lab', hint: 'Counter-pick simulator', icon: Crosshair },
-  { to: '/live', label: 'Live suggestions', hint: 'Read a running Dota game', icon: Radio },
   { to: '/meta-escape', label: 'Meta escape', hint: 'Underplayed heroes and items', icon: Sparkles },
   { to: '/pro', label: 'Pro scene', hint: 'Teams, drafts, pro meta', icon: Trophy },
   { to: '/records', label: 'Records', hint: 'The all-time leaderboards', icon: Medal },
   { to: '/data-lab', label: 'Data lab', hint: 'Query OpenDota directly', icon: Database },
+  { to: '/parser', label: 'Parser lab', hint: 'Parse a local Dota replay', icon: Cpu },
 ]
 
 const SECTION_META: { match: (path: string) => boolean; kicker: string; title: string }[] = [
@@ -64,7 +65,6 @@ const SECTION_META: { match: (path: string) => boolean; kicker: string; title: s
   { match: (path) => path.startsWith('/heroes/'), kicker: 'Hero dossier', title: 'Hero detail' },
   { match: (path) => path.startsWith('/heroes'), kicker: 'Meta index', title: 'Heroes' },
   { match: (path) => path.startsWith('/draft'), kicker: 'Draft intelligence', title: 'Draft lab' },
-  { match: (path) => path.startsWith('/live'), kicker: 'Live telemetry', title: 'Live suggestions' },
   { match: (path) => path.startsWith('/meta-escape'), kicker: 'Outside the meta', title: 'Meta escape' },
   { match: (path) => /^\/matches\/[^/]+/.test(path), kicker: 'Match dossier', title: 'Match detail' },
   { match: (path) => path.startsWith('/matches'), kicker: 'Live feed', title: 'Matches' },
@@ -74,6 +74,7 @@ const SECTION_META: { match: (path: string) => boolean; kicker: string; title: s
   { match: (path) => path.startsWith('/pro'), kicker: 'Circuit intelligence', title: 'Pro scene' },
   { match: (path) => path.startsWith('/records'), kicker: 'Hall of records', title: 'Records' },
   { match: (path) => path.startsWith('/data-lab'), kicker: 'Open data', title: 'Data lab' },
+  { match: (path) => path.startsWith('/parser'), kicker: 'Local replay intelligence', title: 'Parser lab' },
 ]
 
 function resolveSection(path: string) {
@@ -246,6 +247,26 @@ export function AppShell() {
           </button>
 
           <div className="topbar-actions">
+            <div className="topbar-mode" role="group" aria-label="Meta population">
+              <button
+                type="button"
+                className={classNames('topbar-mode-btn', meta.population === 'ranked' && 'is-active')}
+                aria-pressed={meta.population === 'ranked'}
+                onClick={() => meta.setPopulation('ranked')}
+                title="Show ranked matchmaking stats"
+              >
+                Ranked
+              </button>
+              <button
+                type="button"
+                className={classNames('topbar-mode-btn', meta.population === 'turbo' && 'is-active')}
+                aria-pressed={meta.population === 'turbo'}
+                onClick={() => meta.setPopulation('turbo')}
+                title="Show Turbo stats"
+              >
+                Turbo
+              </button>
+            </div>
             <span className={classNames('source-pill', !online && 'is-offline')}>
               <span className="live-dot" />
               <span className="source-pill-label">{online ? 'OpenDota live' : 'Offline cache'}</span>
@@ -264,7 +285,7 @@ export function AppShell() {
             </button>
             <button
               type="button"
-              className="icon-btn"
+              className="icon-btn api-key-btn"
               onClick={() => setApiKeyOpen(true)}
               aria-label="OpenDota API key"
               title="OpenDota API key"
@@ -362,6 +383,7 @@ export function AppShell() {
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} />
       <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
       <ApiKeyDialog open={apiKeyOpen} onClose={() => setApiKeyOpen(false)} />
+      <AutoParserWatcher />
       <InstallDialog
         open={installOpen}
         onClose={() => setInstallOpen(false)}
