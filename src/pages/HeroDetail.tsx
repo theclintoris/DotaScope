@@ -48,6 +48,7 @@ import {
   EmptyState,
   ErrorState,
   HeroPortrait,
+  MetaGradeBadge,
   PageLoader,
   SectionHeading,
   TrendDelta,
@@ -165,6 +166,7 @@ export function HeroDetailPage() {
           <div className="hero-banner-meta">
             <span>
               <Crown size={13} /> Meta score <strong>{metric?.metaScore ?? '—'}</strong>
+              {metric ? <MetaGradeBadge score={metric.metaScore} size="sm" /> : null}
             </span>
             <span>
               <Gauge size={13} /> {formatPercent(metric?.pickRate ?? 0)} pick share

@@ -133,6 +133,30 @@ export function publicTrend(hero: HeroStat) {
   }))
 }
 
+export type MetaGradeLetter = 'S' | 'A' | 'B' | 'C' | 'D'
+
+export interface MetaGradeInfo {
+  grade: MetaGradeLetter
+  label: string
+  tone: 'top' | 'strong' | 'even' | 'weak' | 'poor'
+}
+
+export function metaGradeFor(score: number): MetaGradeInfo {
+  if (!Number.isFinite(score)) return { grade: 'C', label: 'Unrated', tone: 'even' }
+  if (score >= 75) return { grade: 'S', label: 'Meta defining', tone: 'top' }
+  if (score >= 65) return { grade: 'A', label: 'Strong', tone: 'strong' }
+  if (score >= 55) return { grade: 'B', label: 'Average', tone: 'even' }
+  if (score >= 45) return { grade: 'C', label: 'Below curve', tone: 'weak' }
+  return { grade: 'D', label: 'Off meta', tone: 'poor' }
+}
+
+export function bracketWinRate(hero: HeroStat, bracket: number): number | null {
+  if (bracket <= 0) return null
+  const picks = numericField(hero, `${bracket}_pick`)
+  const wins = numericField(hero, `${bracket}_win`)
+  return picks > 0 ? wins / picks : null
+}
+
 export function averageWinRate(metrics: HeroMetric[]): number {
   const totalPicks = metrics.reduce((sum, metric) => sum + metric.picks, 0)
   const totalWins = metrics.reduce((sum, metric) => sum + metric.wins, 0)

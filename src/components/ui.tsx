@@ -3,6 +3,7 @@ import { ArrowDownRight, ArrowUpRight, AlertTriangle, Inbox, RefreshCw } from 'l
 import type { HeroStat } from '../types'
 import { attributeInfo, heroImage, rankMedal, rankLabel } from '../lib/constants'
 import { classNames, formatCompact, formatPercent, initials } from '../lib/format'
+import { metaGradeFor } from '../lib/meta'
 
 export function Skeleton({
   width,
@@ -321,6 +322,58 @@ export function TrendDelta({
       {up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
       {formatPercent(Math.abs(value), 1)}
       <span className="trend-suffix">{suffix}</span>
+    </span>
+  )
+}
+
+export function MetaGradeBadge({
+  score,
+  size = 'md',
+}: {
+  score: number
+  size?: 'sm' | 'md' | 'lg'
+}) {
+  const grade = metaGradeFor(score)
+  return (
+    <span
+      className={classNames('meta-grade-badge', `is-${grade.tone}`, `is-${size}`)}
+      title={`${grade.grade} grade · ${grade.label} · meta score ${Math.round(score)}`}
+      aria-label={`${grade.grade} meta grade: ${grade.label}`}
+    >
+      {grade.grade}
+    </span>
+  )
+}
+
+export function HeroExpectationFlag({
+  actual,
+  expected,
+  games,
+  bracketLabel,
+}: {
+  actual: number
+  expected: number | null
+  games?: number
+  bracketLabel: string
+}) {
+  if (expected == null) {
+    return (
+      <span className="hero-expectation is-na" title={`${bracketLabel} baseline unavailable`}>
+        —
+      </span>
+    )
+  }
+  const delta = actual - expected
+  const direction = Math.abs(delta) < 0.0005 ? 'even' : delta > 0 ? 'up' : 'down'
+  const glyph = direction === 'up' ? '+' : direction === 'down' ? '−' : '±'
+  const deltaLabel = `${delta >= 0 ? '+' : '−'}${(Math.abs(delta) * 100).toFixed(1)} pts`
+  return (
+    <span
+      className={classNames('hero-expectation', `is-${direction}`)}
+      title={`${formatPercent(actual, 1)} actual vs ${bracketLabel} baseline ${formatPercent(expected, 1)} (${deltaLabel})${games ? ` · ${formatCompact(games)} games` : ''}`}
+      aria-label={`${direction === 'up' ? 'Above' : direction === 'down' ? 'Below' : 'At'} ${bracketLabel} expectation by ${Math.abs(delta * 100).toFixed(1)} percentage points`}
+    >
+      {glyph}
     </span>
   )
 }

@@ -28,6 +28,7 @@ import type {
 import { useMeta } from '../context/MetaContext'
 import { TTL } from '../lib/api'
 import { useDocumentTitle, useRemote } from '../lib/hooks'
+import { bracketWinRate } from '../lib/meta'
 import {
   gameModeName,
   rankLabel,
@@ -45,7 +46,9 @@ import {
 import {
   EmptyState,
   ErrorState,
+  HeroExpectationFlag,
   HeroPortrait,
+  MetaGradeBadge,
   PageLoader,
   PlayerAvatar,
   RankBadge,
@@ -86,6 +89,17 @@ export function PlayerDetailPage() {
   const [peerLimit, setPeerLimit] = useState(PEER_PAGE_SIZE)
 
   const heroMap = useMemo(() => new Map(meta.heroes.map((hero) => [hero.id, hero])), [meta.heroes])
+  const metricMap = useMemo(() => new Map(meta.metrics.map((metric) => [metric.hero.id, metric])), [meta.metrics])
+  const playerHeroMap = useMemo(
+    () => new Map((heroes.data ?? []).map((entry) => [entry.hero_id, entry])),
+    [heroes.data],
+  )
+  const rankBracket = profile.data?.rank_tier
+    ? Math.min(7, Math.max(1, Math.floor(profile.data.rank_tier / 10)))
+    : null
+  const bracketLabel = rankBracket
+    ? `${rankLabel(rankBracket * 10).replace(/\s+\d+$/, '')} bracket`
+    : 'all-rank'
 
   const recentRows = useMemo(() => {
     return (recent.data ?? []).map((match) => {
@@ -379,7 +393,18 @@ export function PlayerDetailPage() {
                               title={`Open ${player.personaname || 'player'}'s ${row.hero?.localized_name ?? 'hero'} dossier`}
                             >
                               <HeroPortrait hero={row.hero} size="xs" />
-                              <span>{row.hero?.localized_name}</span>
+                              <span className="player-hero-name">{row.hero?.localized_name}</span>
+                              {metricMap.has(row.hero_id) ? (
+                                <MetaGradeBadge score={metricMap.get(row.hero_id)!.metaScore} size="sm" />
+                              ) : null}
+                              {row.hero ? (
+                                <HeroExpectationFlag
+                                  actual={wr}
+                                  expected={rankBracket ? bracketWinRate(row.hero, rankBracket) : null}
+                                  games={row.games}
+                                  bracketLabel={bracketLabel}
+                                />
+                              ) : null}
                               <ArrowUpRight size={12} className="row-arrow" />
                             </Link>
                           </td>
@@ -406,7 +431,10 @@ export function PlayerDetailPage() {
                 </button>
               </div>
             )}
-            <p className="panel-footnote">Hero pool stats include all parsed matches OpenDota has indexed for this account. Win rate is not bracket-normalized.</p>
+            <p className="panel-footnote">
+              Hero grades follow the current meta lens. The +/− compares this player's hero win rate with
+              OpenDota's {bracketLabel} baseline; hover for the exact rates and sample.
+            </p>
           </section>
 
           <section className="panel squad-panel">
@@ -529,6 +557,11 @@ export function PlayerDetailPage() {
                   <tbody>
                     {matchRows.map((match) => {
                       const hero = heroMap.get(match.hero_id)
+                      const heroMetric = metricMap.get(match.hero_id)
+                      const heroAggregate = playerHeroMap.get(match.hero_id)
+                      const historyWinRate = heroAggregate?.games
+                        ? heroAggregate.win / heroAggregate.games
+                        : null
                       return (
                         <tr key={match.match_id} className={match.won ? 'row-win' : 'row-loss'}>
                           <td>
@@ -544,8 +577,20 @@ export function PlayerDetailPage() {
                               title={`Open ${player.personaname || 'player'}'s hero dossier`}
                             >
                               <HeroPortrait hero={hero} size="xs" />
-                              <span>{hero?.localized_name ?? `Hero ${match.hero_id}`}</span>
-                              <ArrowUpRight size={12} className="row-arrow" />
+                              <span className="match-log-hero-copy">
+                                <span>{hero?.localized_name ?? `Hero ${match.hero_id}`}</span>
+                                <span className="match-log-hero-meta">
+                                  {heroMetric ? <MetaGradeBadge score={heroMetric.metaScore} size="sm" /> : null}
+                                  {historyWinRate != null && heroAggregate && hero ? (
+                                    <HeroExpectationFlag
+                                      actual={historyWinRate}
+                                      expected={rankBracket ? bracketWinRate(hero, rankBracket) : null}
+                                      games={heroAggregate.games}
+                                      bracketLabel={bracketLabel}
+                                    />
+                                  ) : null}
+                                </span>
+                              </span>
                             </Link>
                           </td>
                           <td className="mono">{match.kills} / {match.deaths} / {match.assists}</td>
@@ -562,7 +607,11 @@ export function PlayerDetailPage() {
                 </table>
               </div>
             )}
-            <p className="panel-footnote">Match rows link to the full scoreboard. The public player feed does not include every historical match.</p>
+            <p className="panel-footnote">
+              Match rows link to the full scoreboard. Grades and +/− reflect this player's overall
+              record on that hero, not the result of a single game. The public player feed does not
+              include every historical match.
+            </p>
           </section>
         </div>
 

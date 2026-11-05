@@ -15,12 +15,12 @@ DotaScope brings hero meta, matchups, professional play, player dossiers, match 
 
 - **Meta lens** — switch between ranked pubs, pro and turbo populations, and ranked brackets 1–7. The choice is shared across every page and remembered locally.
 - **Overview** — sample size, meta leader, win-rate extremes, pick pressure, trend chart, bracket/attribute distribution and the latest pro results.
-- **Hero index** — search and filter by attribute, role, attack type and Captain's Mode eligibility; sort by win rate, pick share, picks, trend, meta score or pro presence; export CSV.
+- **Hero index** — search and filter by attribute, role, attack type and Captain's Mode eligibility; sort by win rate, pick share, picks, trend, meta grade or pro presence; export CSV. Every hero carries an S–D current-meta grade derived from win and pick strength.
 - **Hero dossier** — matchups, duration profile, item phases, bracket spread, pro pick/ban presence, daily pick history and base stats.
 - **Matches** — the latest pro and public feeds with league, team, mode, lobby, rank, duration and time filters. Direct match-ID lookup.
 - **Match detail** — gold/XP advantage chart, both scoreboards, items, KDA, GPM/XPM, last hits/denies, damage and a pick/ban draft board.
 - **Players** — global OpenDota player search, numeric account shortcut, and a searchable professional directory.
-- **Player profile** — career W/L, rank, estimated MMR, recent form, hero pool, match log, lane mix and attribute comfort.
+- **Player profile** — career W/L, rank, estimated MMR, recent form, hero pool, match log, lane mix and attribute comfort. Hero-pool and match-log rows show the current meta grade plus a +/− flag comparing the player's hero win rate with the OpenDota baseline for their own rank bracket.
 - **Performance review** — OpenDota hero-benchmarked percentiles for farm, experience, last hits, hero impact, teamfight and survival across the latest ranked standard games, plus linked heuristic review flags and a strongest-signal callout. Turbo and unranked games are excluded because benchmarks are standard-match distributions.
 - **Player hero dossier** — click any hero in a player's pool or match log for hero-specific win rate, form, KDA, final-item telemetry, recent builds and the full paginated match archive on that hero.
 - **Draft lab** — a 5v5 counter-pick board for both line-ups, with role-filtered suggestions, matchup edges, item-independent meta blends and an MMR bracket guardrail. The bracket control reweights suggestions by that rank's win/pick rates; OpenDota does not publish bracket-split head-to-head samples, which the screen states explicitly. Signed-in players can weight suggestions by their own hero pool, with personal sample size and win rate shown on each card.

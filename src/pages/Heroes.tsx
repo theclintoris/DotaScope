@@ -25,6 +25,7 @@ import {
   EmptyState,
   ErrorState,
   HeroPortrait,
+  MetaGradeBadge,
   PageHeader,
   PageLoader,
   Sparkline,
@@ -42,7 +43,7 @@ const COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
   { key: 'pickRate', label: 'Pick share', numeric: true },
   { key: 'picks', label: 'Picks', numeric: true },
   { key: 'trend', label: 'Daily trend', numeric: true },
-  { key: 'metaScore', label: 'Meta score', numeric: true },
+  { key: 'metaScore', label: 'Meta grade', numeric: true },
   { key: 'pro', label: 'Pro presence', numeric: true },
 ]
 
@@ -179,7 +180,7 @@ export function HeroesPage() {
       <PageHeader
         eyebrow={<><Swords size={12} /> Hero intelligence</>}
         title={<>Every hero. <em>Every angle.</em></>}
-        description="Sort the full roster by win rate, pick share, meta score, or pro presence. Filter by attribute, role, attack type, and Captain's Mode eligibility."
+        description="Sort the full roster by win rate, pick share, meta grade, or pro presence. Filter by attribute, role, attack type, and Captain's Mode eligibility."
         actions={
           <>
             <button type="button" className="btn btn-ghost" onClick={exportCsv} disabled={!rows.length}>
@@ -393,18 +394,7 @@ export function HeroesPage() {
                           </span>
                         </td>
                         <td className="num">
-                          <span
-                            className={classNames(
-                              'meta-score-pill',
-                              metric.metaScore >= 60
-                                ? 'is-high'
-                                : metric.metaScore <= 40
-                                  ? 'is-low'
-                                  : '',
-                            )}
-                          >
-                            {metric.metaScore}
-                          </span>
+                          <MetaGradeBadge score={metric.metaScore} />
                         </td>
                         <td className="num">
                           <span className="pro-presence">
@@ -431,7 +421,7 @@ export function HeroesPage() {
                     <strong>{metric.hero.localized_name}</strong>
                     <small>{metric.hero.roles.slice(0, 2).join(' · ')}</small>
                   </div>
-                  <span className="meta-score-pill">{metric.metaScore}</span>
+                  <MetaGradeBadge score={metric.metaScore} size="sm" />
                 </div>
                 <div className="hero-mobile-stats">
                   <div>
@@ -470,7 +460,8 @@ export function HeroesPage() {
             <span className="eyebrow">Reading the numbers</span>
             <p>
               Win rates are blended across the selected population. Pick share is this hero's portion of
-              all picks in the sample. Pro presence counts drafted picks and bans.
+              all picks in the sample. Meta grade blends win and pick strength: S 75+, A 65–74, B 55–64,
+              C 45–54, D below 45. Pro presence counts drafted picks and bans.
             </p>
             <div className="aside-legend">
               <span>

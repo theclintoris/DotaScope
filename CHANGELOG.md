@@ -17,12 +17,15 @@ Android and the web, built on the OpenDota public API.
   shared by every page and persisted locally.
 - **Hero intelligence** — sortable and filterable hero index, CSV export,
   matchups, duration profile, item phases, bracket spread, pro presence, daily
-  pick history and base stats.
+  pick history and base stats. Every hero carries an S–D current-meta grade
+  based on blended win and pick strength.
 - **Match intelligence** — latest pro and public feeds, direct match-ID lookup,
   gold/XP advantage graph, ten-player scoreboards, item slots, KDA, economy and
   draft boards.
 - **Player intelligence** — global player search, pro directory, career record,
   ranked medal, estimated MMR, form log, hero pool, lane mix and attribute mix.
+  Hero-pool and match-log rows compare the player's win rate with their
+  rank-bracket baseline and mark over/under-performance with a +/− flag.
 - **Player hero dossier** — per-hero win rate, recent form, KDA, final-item
   telemetry, sampled builds and a full paginated match archive reached by
   clicking a hero in any player dossier.
