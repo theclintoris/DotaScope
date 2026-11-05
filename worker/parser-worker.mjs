@@ -29,9 +29,12 @@ const REPLAY_DIR = resolve(process.env.DOTA_REPLAY_DIR ?? DEFAULT_REPLAY_DIR)
 const JAVA_BIN = process.env.JAVA_BIN ?? join(ROOT, '.toolchain', 'jdk-21.0.13+9', 'bin', 'java.exe')
 const PARSER_JAR = process.env.OPENDOTA_PARSER_JAR ?? join(ROOT, '.toolchain', 'odota-parser', 'target', 'stats-0.1.0.jar')
 const SEVEN_ZIP_BIN = process.env.SEVEN_ZIP_BIN ?? 'C:\\Program Files\\7-Zip\\7z.exe'
+const JAVA_TMP_DIR = join(DATA_DIR, 'java-tmp')
 const TURBO_HISTORY_PATH = join(DATA_DIR, 'turbo-history.json')
+const RANKED_HISTORY_PATH = join(DATA_DIR, 'ranked-history.json')
 
 mkdirSync(DATA_DIR, { recursive: true })
+mkdirSync(JAVA_TMP_DIR, { recursive: true })
 
 let parserProcess = null
 let parserStarting = null
@@ -100,7 +103,7 @@ async function ensureParser() {
     throw new Error(`OpenDota parser is not available. Expected Java at ${JAVA_BIN} and jar at ${PARSER_JAR}.`)
   }
   parserStarting = new Promise((resolvePromise, reject) => {
-    const child = spawn(JAVA_BIN, ['-jar', PARSER_JAR], {
+    const child = spawn(JAVA_BIN, [`-Djava.io.tmpdir=${JAVA_TMP_DIR}`, '-jar', PARSER_JAR], {
       cwd: ROOT,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -359,7 +362,7 @@ async function downloadReplay(matchId, match) {
 }
 
 async function parseReplay(matchId, options = {}) {
-  const { force = false, download = false, turboOnly = false } =
+  const { force = false, download = false, turboOnly = false, competitiveOnly = false } =
     typeof options === 'boolean' ? { force: options } : options
   const match = await openDotaMatch(matchId)
   if (turboOnly && match && Number(match.game_mode) !== 23) {
@@ -370,12 +373,25 @@ async function parseReplay(matchId, options = {}) {
       gameMode: typeof match?.game_mode === 'number' ? match.game_mode : null,
     }
   }
+  if (competitiveOnly && match) {
+    const gameMode = Number(match.game_mode)
+    const lobbyType = Number(match.lobby_type)
+    if (gameMode !== 23 && lobbyType !== 7) {
+      return {
+        skipped: true,
+        reason: 'not-ranked-or-turbo',
+        matchId,
+        gameMode: Number.isFinite(gameMode) ? gameMode : null,
+        lobbyType: Number.isFinite(lobbyType) ? lobbyType : null,
+      }
+    }
+  }
 
   const rawPath = join(DATA_DIR, `${matchId}.jsonl`)
   const statsPath = join(DATA_DIR, `${matchId}.stats.json`)
   if (!force && existsSync(statsPath)) {
     const cachedStats = JSON.parse(readFileSync(statsPath, 'utf8'))
-    try { recordTurboHistory(cachedStats) } catch { /* cache remains usable */ }
+    try { recordParsedHistories(cachedStats) } catch { /* cache remains usable */ }
     return { cached: true, ...cachedStats }
   }
 
@@ -397,33 +413,31 @@ async function parseReplay(matchId, options = {}) {
   writeFileSync(rawPath, Buffer.from(await response.arrayBuffer()))
   const stats = await summarise(rawPath, matchId)
   writeFileSync(statsPath, `${JSON.stringify(stats, null, 2)}\n`)
+  try { recordParsedHistories(stats) } catch { /* parse result is still usable */ }
   return { cached: false, ...stats }
 }
 
-function loadTurboHistory() {
-  if (!existsSync(TURBO_HISTORY_PATH)) return []
+function loadHistory(path) {
+  if (!existsSync(path)) return []
   try {
-    const parsed = JSON.parse(readFileSync(TURBO_HISTORY_PATH, 'utf8'))
+    const parsed = JSON.parse(readFileSync(path, 'utf8'))
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
   }
 }
 
-function saveTurboHistory(rows) {
-  const temporary = `${TURBO_HISTORY_PATH}.tmp`
+function saveHistory(path, rows) {
+  const temporary = `${path}.tmp`
   writeFileSync(temporary, `${JSON.stringify(rows, null, 2)}
 `)
-  renameSync(temporary, TURBO_HISTORY_PATH)
+  renameSync(temporary, path)
 }
 
-function recordTurboHistory(stats) {
-  if (Number(stats?.match?.gameMode) !== 23) return
-  const history = loadTurboHistory()
-  const byKey = new Map(history.map((row) => [`${row.match_id}:${row.account_id}`, row]))
-  for (const player of stats.players ?? []) {
-    if (!player.accountId) continue
-    const row = {
+function historyRows(stats) {
+  return (stats.players ?? [])
+    .filter((player) => player.accountId)
+    .map((player) => ({
       match_id: Number(stats.match.matchId),
       account_id: player.accountId,
       player_slot: player.playerSlot,
@@ -431,7 +445,7 @@ function recordTurboHistory(stats) {
       hero_id: player.heroId,
       start_time: stats.match.startTime,
       duration: stats.match.duration,
-      game_mode: 23,
+      game_mode: stats.match.gameMode,
       lobby_type: stats.match.lobbyType,
       kills: player.kills,
       deaths: player.deaths,
@@ -442,21 +456,50 @@ function recordTurboHistory(stats) {
       denies: player.denies,
       hero_damage: player.heroDamage,
       source: 'local-parser',
-    }
-    byKey.set(`${row.match_id}:${row.account_id}`, row)
-  }
-  const merged = [...byKey.values()].sort((a, b) => b.start_time - a.start_time)
-  saveTurboHistory(merged)
+    }))
 }
 
-function turboHistoryFor(accountId, limit) {
-  const rows = loadTurboHistory()
+function recordHistory(path, stats) {
+  const history = loadHistory(path)
+  const byKey = new Map(history.map((row) => [`${row.match_id}:${row.account_id}`, row]))
+  for (const row of historyRows(stats)) {
+    byKey.set(`${row.match_id}:${row.account_id}`, row)
+  }
+  saveHistory(path, [...byKey.values()].sort((a, b) => b.start_time - a.start_time))
+}
+
+function recordTurboHistory(stats) {
+  if (Number(stats?.match?.gameMode) !== 23) return
+  recordHistory(TURBO_HISTORY_PATH, stats)
+}
+
+function recordRankedHistory(stats) {
+  if (Number(stats?.match?.gameMode) !== 22) return
+  if (Number(stats?.match?.lobbyType) !== 7) return
+  recordHistory(RANKED_HISTORY_PATH, stats)
+}
+
+function recordParsedHistories(stats) {
+  recordTurboHistory(stats)
+  recordRankedHistory(stats)
+}
+
+function historyFor(path, accountId, limit) {
+  const rows = loadHistory(path)
   const filtered = accountId
     ? rows.filter((row) => Number(row.account_id) === accountId)
     : rows
   return filtered
     .sort((a, b) => b.start_time - a.start_time)
     .slice(0, limit)
+}
+
+function turboHistoryFor(accountId, limit) {
+  return historyFor(TURBO_HISTORY_PATH, accountId, limit)
+}
+
+function rankedHistoryFor(accountId, limit) {
+  return historyFor(RANKED_HISTORY_PATH, accountId, limit)
 }
 
 const BACKFILL_LIMIT = 500
@@ -577,6 +620,13 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { accountId, count: matches.length, matches })
     }
 
+    if (req.method === 'GET' && url.pathname === '/ranked-history') {
+      const accountId = Number(url.searchParams.get('accountId') ?? 0) || null
+      const limit = Math.max(1, Math.min(5000, Number(url.searchParams.get('limit') ?? 1000) || 1000))
+      const matches = rankedHistoryFor(accountId, limit)
+      return json(res, 200, { accountId, count: matches.length, matches })
+    }
+
     if (req.method === 'GET' && url.pathname === '/recent-turbo') {
       const accountId = Number(url.searchParams.get('accountId') ?? 0) || 0
       if (!accountId) return json(res, 400, { error: 'accountId is required' })
@@ -638,6 +688,7 @@ const server = createServer(async (req, res) => {
         force: Boolean(parsed.force),
         download: Boolean(parsed.download),
         turboOnly: Boolean(parsed.turboOnly),
+        competitiveOnly: Boolean(parsed.competitiveOnly),
       })
       return json(res, 200, result)
     }

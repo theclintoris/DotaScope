@@ -55,13 +55,13 @@ export function AutoParserWatcher() {
       const attempt = (attempts.current.get(matchId) ?? 0) + 1
       attempts.current.set(matchId, attempt)
       busy.current = true
-      showToast({ kind: 'working', message: `Turbo finished. Reading replay ${matchId}…` })
+      showToast({ kind: 'working', message: `Match finished. Reading replay ${matchId}…` })
       try {
         await new Promise((resolve) => window.setTimeout(resolve, AUTO_PARSE_DELAY_MS))
         const response = await fetch(`${WORKER_URL}/parse`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ matchId, download: true, turboOnly: true }),
+          body: JSON.stringify({ matchId, download: true, competitiveOnly: true }),
         })
         const data = (await response.json().catch(() => null)) as
           | { error?: string; skipped?: boolean; reason?: string; match?: { gameModeName?: string } }
@@ -69,11 +69,11 @@ export function AutoParserWatcher() {
         if (!response.ok) throw new Error(data?.error ?? `Parser worker returned ${response.status}.`)
         attempts.current.delete(matchId)
         if (data?.skipped) {
-          showToast({ kind: 'info', message: 'That match was not Turbo, so it was left alone.' })
+          showToast({ kind: 'info', message: 'That match was not Ranked or Turbo, so it was left alone.' })
         } else {
           showToast({
             kind: 'success',
-            message: `Turbo replay parsed${data?.match?.gameModeName ? ` · ${data.match.gameModeName}` : ''}. Open Parser lab for the full line-up.`,
+            message: `Replay parsed${data?.match?.gameModeName ? ` · ${data.match.gameModeName}` : ''}. Open Parser lab for the full line-up.`,
           })
         }
       } catch (error) {
@@ -106,7 +106,7 @@ export function AutoParserWatcher() {
     <div className={classNames('auto-parse-toast', `is-${toast.kind}`)} role="status" aria-live="polite">
       <span className="auto-parse-icon"><Icon size={17} className={toast.kind === 'working' ? 'spin' : undefined} /></span>
       <span className="auto-parse-copy">
-        <strong>{toast.kind === 'working' ? 'Automatic replay parse' : toast.kind === 'success' ? 'Turbo data ready' : toast.kind === 'error' ? 'Auto-parse needs a hand' : 'Replay skipped'}</strong>
+        <strong>{toast.kind === 'working' ? 'Automatic replay parse' : toast.kind === 'success' ? 'Match data ready' : toast.kind === 'error' ? 'Auto-parse needs a hand' : 'Replay skipped'}</strong>
         <span>{toast.message}</span>
         <Link to="/parser">Open Parser lab</Link>
       </span>

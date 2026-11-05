@@ -54,16 +54,22 @@ All notable changes to DotaScope are recorded here. The public release lives at
   designed to run while DotaScope and the local worker stay open.
 - **Removed Live suggestions** — the GSI cockpit UI was removed as unnecessary.
   The loopback GSI bridge and post-game watcher remain because auto-parse needs
-  them; setup now lives under Turbo auto-parse in the README.
-- **Automatic Turbo parsing** — while DotaScope is open on Windows, the
-  post-game GSI state triggers a background parse of the finished Turbo match
-  when the local worker is running, with a progress toast and Parser lab link.
+  them; setup now lives under Ranked and Turbo auto-parse in the README.
+- **Automatic Ranked and Turbo parsing** — while DotaScope is open on Windows,
+  the post-game GSI state triggers a background parse of the finished Ranked
+  standard or Turbo match when the local worker is running, with a progress
+  toast and Parser lab link.
+- **Local Ranked history** — parsed Ranked standard games are persisted in
+  `worker/data/ranked-history.json` and merged into the Records performance
+  cards alongside parsed Turbo history. Replays are parsed locally without an
+  OpenDota API key; missing/expired Valve replays still need Dota's manual
+  Download Replay.
 - **Personal record books** — the Records page now surfaces the pinned
   profile's best kills, deaths, assists, KDA, longest game, longest win streak,
-  and (for parsed Turbo games) GPM/XPM/last hits/hero damage. The book follows
-  the global Ranked/Turbo lens and can be filtered to a single hero; ranked
-  records page through the account's available ranked history, while Turbo
-  combines the latest-20 sample with local parsed history.
+  and (for parsed Ranked or Turbo games) GPM/XPM/last hits/hero damage. The book
+  follows the global Ranked/Turbo lens and can be filtered to a single hero;
+  ranked records page through the account's available ranked history, while
+  Turbo combines the latest-20 sample with local parsed history.
 
 ### Changed
 
@@ -76,6 +82,7 @@ All notable changes to DotaScope are recorded here. The public release lives at
 
 ### Fixed
 
+- The local Java parser now uses a writable temp directory under `worker/data/java-tmp`, avoiding Windows temp-directory permission failures when loading Snappy or unpacking the replay. Ranked standard replays and Turbo replays share the same local parsing path.
 - The Windows launcher is now single-instance. Launching DotaScope again — including
   from the Steam shortcut — focuses the running window instead of starting a second
   WebView2 host against an in-use profile, which previously surfaced a misleading

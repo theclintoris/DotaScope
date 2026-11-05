@@ -280,7 +280,7 @@ export function ParserLabPage() {
       <PageHeader
         eyebrow="LOCAL REPLAY INTELLIGENCE"
         title={<>Parse the <em>unparsed</em>.</>}
-        description="Run the OpenDota replay parser locally to unlock Turbo stats, ward work, purchases and the details the public feed leaves out."
+        description="Run the OpenDota replay parser locally to unlock Ranked and Turbo performance, ward work, purchases and the details the public feed leaves out."
         actions={
           <>
             <span className={`parser-status-pill${health ? ' is-online' : ''}`}>
@@ -301,7 +301,8 @@ export function ParserLabPage() {
           <h2>Local replay lab</h2>
           <p>
             The parser is a local Java worker. It reads the actual <code>.dem</code> replay from your Dota 2 folder,
-            so it can recover Turbo data and utility stats that are not in the public match feed.
+            so it can recover Ranked and Turbo performance plus utility stats that are not in the public match feed.
+            Automatic post-game parsing covers both modes when a replay is available.
           </p>
         </div>
         <div className="parser-source-note">
@@ -318,7 +319,8 @@ export function ParserLabPage() {
             <h2>Build the archive while you sleep.</h2>
             <p>
               Queue match IDs newest-first. The worker downloads Valve replays when OpenDota has a replay URL,
-              then parses each one locally and extends your Turbo history.
+              then parses each one locally. This queue is Turbo-focused; automatic post-game parsing covers Ranked
+              and Turbo and extends both histories.
             </p>
           </div>
           <span className={`parser-backfill-pill${backfill?.status === 'running' ? ' is-running' : ''}`}>

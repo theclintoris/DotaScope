@@ -51,7 +51,7 @@ curl -X POST http://127.0.0.1:5601/parse \
   -d '{"matchId":"8952476726"}'
 ```
 
-Parsed data is stored under `worker/data/` and is gitignored. Successful Turbo parses also append normalized player rows to `worker/data/turbo-history.json`, so DotaScope can build a Turbo history longer than OpenDota's 20-match sample. The file is local and is not uploaded.
+Parsed data is stored under `worker/data/` and is gitignored. Successful Ranked standard parses append normalized player rows to `worker/data/ranked-history.json`; successful Turbo parses append to `worker/data/turbo-history.json`. DotaScope merges both local histories into the player and Records views, so Ranked performance cards and Turbo history can grow without an OpenDota paid key. These files are local and are not uploaded. The Java parser uses `worker/data/java-tmp` as its writable temp directory.
 
 The Parser lab's **Turbo backfill** queue uses `/recent-turbo` and `/backfill`. It downloads a replay only when OpenDota returns a replay URL; otherwise the match is recorded as an error and the user must download that replay from Dota 2. Valve replay retention is finite, so older matches may no longer be recoverable.
 
@@ -61,9 +61,10 @@ The Parser lab's **Turbo backfill** queue uses `/recent-turbo` and `/backfill`. 
 | --- | --- | --- |
 | GET | `/health` | Worker/parser status and configured directories |
 | GET | `/replays` | `.dem` files in the replay directory |
-| POST | `/parse` | Body `{ "matchId": "...", "force": false, "download": false, "turboOnly": false }`; runs the parser, optionally downloading the replay |
+| POST | `/parse` | Body `{ "matchId": "...", "force": false, "download": false, "turboOnly": false, "competitiveOnly": false }`; runs the parser, optionally downloading the replay. `competitiveOnly` accepts Ranked standard (`game_mode 22`, `lobby_type 7`) or Turbo. |
 | GET | `/stats/:matchId` | Previously generated stats |
 | GET | `/turbo-history?accountId=&limit=` | Parsed Turbo rows for one account, newest first |
+| GET | `/ranked-history?accountId=&limit=` | Parsed Ranked standard rows for one account, newest first |
 | GET | `/recent-turbo?accountId=` | OpenDota's latest-20 feed filtered to Turbo |
 | POST | `/backfill` | Body `{ "matchIds": ["..."] }`; queues newest-first Turbo downloads/parses |
 | GET | `/backfill` | Current/last queue progress and per-match results |
@@ -75,4 +76,5 @@ The Parser lab's **Turbo backfill** queue uses `/recent-turbo` and `/backfill`. 
 - Parsing is CPU-heavy and should not be exposed to the public internet.
 - The parser output does not include final inventories. Item purchase logs are present in the raw output and can be added in a later pass.
 - Turbo history only includes matches parsed while this worker is running (or matches whose Valve replay URL is still available). Older Turbo games are not backfillable from OpenDota's public career feed.
-- The parser is mode-agnostic; `turboOnly` is enforced from OpenDota match metadata before parsing.
+- The parser is mode-agnostic; `turboOnly` and `competitiveOnly` are enforced from OpenDota match metadata before parsing. Ranked standard is `game_mode 22` with `lobby_type 7`.
+- Local Ranked history only includes matches parsed while the worker is running, or matches whose Valve replay URL is still available. Missing or expired replays must be downloaded from Dota 2 manually.

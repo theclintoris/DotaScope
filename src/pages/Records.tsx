@@ -25,6 +25,7 @@ import { useDocumentTitle, useRemote } from '../lib/hooks'
 import { formatDuration, formatNumber, timeAgo } from '../lib/format'
 import { isPerformanceMatch, matchWon, type MatchSummary } from '../lib/matchMode'
 import { mergeRecentWithTurbo, useTurboHistory } from '../lib/turboHistory'
+import { useRankedHistory } from '../lib/rankedHistory'
 import { apiGet } from '../lib/api'
 import { useMeta } from '../context/MetaContext'
 import { useProfile } from '../context/ProfileContext'
@@ -336,17 +337,23 @@ function PersonalRecordsSection() {
     60 * 1000,
   )
   const turboHistory = useTurboHistory(accountId)
+  const rankedHistory = useRankedHistory(accountId)
 
   const mode: 'ranked' | 'turbo' = meta.population === 'turbo' ? 'turbo' : 'ranked'
   const turboRows = useMemo(
     () => mergeRecentWithTurbo(recent.data ?? [], turboHistory.rows).filter((match) => match.game_mode === 23),
     [recent.data, turboHistory.rows],
   )
+  const rankedPerformanceRows = useMemo(() => {
+    const base = rankedHistory.rows.filter((match) => match.game_mode === 22 && match.lobby_type === 7)
+    return heroId === 'all' ? base : base.filter((match) => match.hero_id === Number(heroId))
+  }, [rankedHistory.rows, heroId])
   const rows = useMemo(() => {
     const base: MatchSummary[] = mode === 'ranked' ? ranked.rows : turboRows
     const filtered = heroId === 'all' ? base : base.filter((match) => match.hero_id === Number(heroId))
     return [...filtered].sort((a, b) => b.start_time - a.start_time)
   }, [mode, ranked.rows, turboRows, heroId])
+  const performanceRows = mode === 'ranked' ? rankedPerformanceRows : rows
   const loading = mode === 'ranked'
     ? ranked.loading
     : recent.loading || turboHistory.loading
@@ -383,18 +390,18 @@ function PersonalRecordsSection() {
       })
     }
 
-    if (mode === 'turbo') {
-      push(makePersonalRecord(rows, 'Highest GPM', <Coins size={16} />, (row) => (isPerformanceMatch(row) ? row.gold_per_min : null), formatNumber, 'gold per minute'))
-      push(makePersonalRecord(rows, 'Highest XPM', <Sparkles size={16} />, (row) => (isPerformanceMatch(row) ? row.xp_per_min : null), formatNumber, 'experience per minute'))
-      push(makePersonalRecord(rows, 'Most last hits', <Axe size={16} />, (row) => (isPerformanceMatch(row) ? row.last_hits : null), formatNumber, 'single game'))
-      push(makePersonalRecord(rows, 'Most hero damage', <Shield size={16} />, (row) => (isPerformanceMatch(row) ? row.hero_damage : null), formatNumber, 'single game'))
+    if (mode === 'turbo' || (mode === 'ranked' && performanceRows.length > 0)) {
+      push(makePersonalRecord(performanceRows, 'Highest GPM', <Coins size={16} />, (row) => (isPerformanceMatch(row) ? row.gold_per_min : null), formatNumber, 'gold per minute'))
+      push(makePersonalRecord(performanceRows, 'Highest XPM', <Sparkles size={16} />, (row) => (isPerformanceMatch(row) ? row.xp_per_min : null), formatNumber, 'experience per minute'))
+      push(makePersonalRecord(performanceRows, 'Most last hits', <Axe size={16} />, (row) => (isPerformanceMatch(row) ? row.last_hits : null), formatNumber, 'single game'))
+      push(makePersonalRecord(performanceRows, 'Most hero damage', <Shield size={16} />, (row) => (isPerformanceMatch(row) ? row.hero_damage : null), formatNumber, 'single game'))
     }
 
     return records
-  }, [rows, mode])
+  }, [rows, performanceRows, mode])
 
   const sourceNote = mode === 'ranked'
-    ? `Ranked · ${formatNumber(ranked.rows.length)} ranked matches`
+    ? `Ranked · ${formatNumber(ranked.rows.length)} ranked matches${rankedHistory.count > 0 ? ` · ${formatNumber(rankedHistory.count)} parsed` : ''}`
     : `Turbo · ${formatNumber(turboRows.length)} OpenDota + locally parsed games`
   const scopeNote = hero
     ? `${hero.localized_name} only`
@@ -487,7 +494,7 @@ function PersonalRecordsSection() {
           <p className="panel-footnote">
             Ranked records page through all ranked matches OpenDota returns for the account; Turbo records use the
             latest 20-match sample plus every Turbo game parsed by your local worker. GPM, XPM, last hits and hero
-            damage appear only for parsed Turbo games.
+            damage appear only for parsed Ranked or Turbo games.
           </p>
         </>
       )}
