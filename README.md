@@ -24,6 +24,7 @@ DotaScope brings hero meta, matchups, professional play, player dossiers, match 
 - **Performance review** — OpenDota hero-benchmarked percentiles for farm, experience, last hits, hero impact, teamfight and survival across the latest ranked standard games, plus linked heuristic review flags and a strongest-signal callout. Turbo and unranked games are excluded because benchmarks are standard-match distributions.
 - **Player hero dossier** — click any hero in a player's pool or match log for hero-specific win rate, form, KDA, final-item telemetry, recent builds and the full paginated match archive on that hero.
 - **Draft lab** — a 5v5 counter-pick board for both line-ups, with role-filtered suggestions, matchup edges, item-independent meta blends and an MMR bracket guardrail. The bracket control reweights suggestions by that rank's win/pick rates; OpenDota does not publish bracket-split head-to-head samples, which the screen states explicitly. Signed-in players can weight suggestions by their own hero pool, with personal sample size and win rate shown on each card.
+- **Live suggestions** — Windows-only Game State Integration cockpit. Reads the local Dota 2 game through a loopback-only GSI bridge and turns your hero, clock, inventory and visible draft into a small item plan: popular phase items plus curated counters for invisibility, magic burst, healing, silence, physical damage and illusions. Normal play exposes only your own inventory; enemy inventories require spectating. Web and Android explain the desktop requirement.
 - **Meta escape** — underplayed and underbought options with evidence. The board surfaces below-median heroes with winning matchup samples into the current top five, plus expensive low-purchase-rate items and the escape heroes who actually buy them. Counter edges are clearly attributed to the carrier hero, not the item, because OpenDota does not publish item-specific matchups. A nested **Off-meta builds** board adds unusual final-item choices on the current meta heroes, their buy-rate lift and the heroes best positioned against them.
 - **Immortal lens** — OpenDota has no usable Immortal pub aggregate. DotaScope adds an **Immortal** population using Spectral's public weekly top-ladder sample: hero pick/win rates, matchup edges, source attribution and no medal bracket split. The global Meta lens and Meta escape both use it.
 - **Squad performance** — a player's most frequent public teammates, with games together, duo win rate, last queued and average GPM, sortable by games or win rate. This uses OpenDota's public peer history, not Steam's private friends list.
@@ -32,6 +33,18 @@ DotaScope brings hero meta, matchups, professional play, player dossiers, match 
 - **Records** — twelve historical record books across parsed public matches.
 - **Data Lab** — a read-only OpenDota SQL editor with a table/schema browser, examples, CSV export and a hard 100-row cap.
 - **PWA shell** — install prompt, service worker, offline shell, safe-area mobile navigation, command palette (`Ctrl/⌘ K`) and responsive layouts from 390 px upward.
+
+## Live suggestions setup (Windows)
+
+DotaScope reads the local game through Valve's official **Game State Integration** feed. Dota 2 exposes your hero, clock, items and the visible draft; it does not expose enemy inventories during normal play (those appear only while spectating).
+
+1. Install the GSI config from the Live suggestions screen, or copy
+   [`public/integrations/gamestate_integration_dotascope.cfg`](public/integrations/gamestate_integration_dotascope.cfg) to
+   `…\Steam\steamapps\common\dota 2 beta\game\dota\cfg\gamestate_integration\`.
+2. Keep `-gamestateintegration` in Dota 2's Steam launch options.
+3. Start DotaScope, open **Live suggestions**, then start or spectate a Dota 2 match.
+
+The bridge listens only on `127.0.0.1:53000`. It never reads game memory or touches game files beyond loading the user-installed GSI config.
 
 ## Update log
 

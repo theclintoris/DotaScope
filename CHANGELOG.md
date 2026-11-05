@@ -23,6 +23,11 @@ All notable changes to DotaScope are recorded here. The public release lives at
   matches offer a replay-parse request when a key is configured.
 - **Ranked-only performance review** — benchmark percentiles and review flags
   now use only ranked standard games; Turbo and unranked matches are excluded.
+- **Live suggestions** — a Windows-only GSI cockpit that reads the local Dota 2
+  game through a loopback bridge and proposes popular phase items plus curated
+  counters for the visible draft. Normal play exposes only your own inventory;
+  spectating can expose all-player data. Includes downloadable GSI config,
+  setup states and honest source limitations.
 - **Hero and match-history grades** — S–D current-meta grades plus a +/−
   expectation flag comparing the player's hero win rate with their rank
   bracket's baseline.

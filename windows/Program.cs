@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
@@ -47,6 +48,7 @@ internal static class Program
         Log($"startup exe={Application.ExecutablePath} local={Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)}");
 
         TryPrepareWebView2Loader(dataRoot);
+        GsiBridge.Start();
 
         string webRoot;
         try
@@ -310,6 +312,26 @@ internal sealed class MainForm : Form
                 ProgramHost,
                 _webRoot,
                 CoreWebView2HostResourceAccessKind.DenyCors);
+
+            core.AddWebResourceRequestedFilter(
+                $"https://{ProgramHost}/gsi/latest",
+                CoreWebView2WebResourceContext.All);
+            core.WebResourceRequested += (_, args) =>
+            {
+                if (!args.Request.Uri.StartsWith(
+                        $"https://{ProgramHost}/gsi/latest",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                byte[] json = Encoding.UTF8.GetBytes(GsiBridge.LatestJson());
+                args.Response = core.Environment.CreateWebResourceResponse(
+                    new MemoryStream(json),
+                    200,
+                    "OK",
+                    "Content-Type: application/json; charset=utf-8\r\nCache-Control: no-store");
+            };
 
             core.NewWindowRequested += (_, args) =>
             {
