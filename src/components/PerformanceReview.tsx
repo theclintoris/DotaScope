@@ -42,6 +42,8 @@ interface ReviewFlag {
   icon: ReactNode
 }
 
+const RANKED_LOBBY_TYPES = new Set([5, 6, 7])
+
 const METRICS: MetricSpec[] = [
   {
     key: 'gold_per_min',
@@ -158,7 +160,10 @@ function scoreTone(score: number | null) {
 
 export function PerformanceReview({ matches }: { matches: RecentMatch[] }) {
   const reviewMatches = useMemo(
-    () => matches.filter((match) => match.game_mode !== 23).slice(0, 10),
+    () =>
+      matches
+        .filter((match) => RANKED_LOBBY_TYPES.has(match.lobby_type) && match.game_mode !== 23)
+        .slice(0, 10),
     [matches],
   )
   const heroKey = useMemo(
@@ -290,8 +295,8 @@ export function PerformanceReview({ matches }: { matches: RecentMatch[] }) {
     <section className="performance-review">
       <SectionHeading
         eyebrow="Performance review"
-        title="Recent games, benchmarked"
-        hint={`${measuredGames} standard ${measuredGames === 1 ? 'game' : 'games'} measured`}
+        title="Ranked games, benchmarked"
+        hint={`${measuredGames} ranked ${measuredGames === 1 ? 'game' : 'games'} measured`}
         action={
           <span className="badge badge-muted">
             <ShieldCheck size={12} /> Hero-level benchmarks
@@ -309,7 +314,7 @@ export function PerformanceReview({ matches }: { matches: RecentMatch[] }) {
                 <span>{scoreBand(overall)}</span>
               </div>
               <p>
-                Across six efficiency signals, the median of your last {measuredGames || 10} measured games.
+                Across six efficiency signals, the median of your {measuredGames || 0} ranked games.
               </p>
             </div>
             <div
@@ -353,8 +358,8 @@ export function PerformanceReview({ matches }: { matches: RecentMatch[] }) {
 
           {error ? <div className="inline-alert">{error}</div> : null}
           <p className="panel-footnote">
-            Percentiles compare your hero-level rate to OpenDota's parsed public sample. Benchmarks are not
-            bracket-split, and Turbo games are excluded so the comparison stays in standard-match context.
+            Ranked standard matches only; Turbo and unranked games are excluded. Percentiles compare your
+            hero-level rate to OpenDota's parsed public sample, which is not bracket-split.
           </p>
         </div>
 
@@ -364,7 +369,7 @@ export function PerformanceReview({ matches }: { matches: RecentMatch[] }) {
               <span className="eyebrow">Review flags</span>
               <h2>Patterns worth a look</h2>
             </div>
-            <span className="badge badge-muted">{reviewMatches.length} standard</span>
+            <span className="badge badge-muted">{reviewMatches.length} ranked</span>
           </div>
 
           {flags.length ? (

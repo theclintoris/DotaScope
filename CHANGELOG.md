@@ -30,9 +30,10 @@ Android and the web, built on the OpenDota public API.
   together, duo win rate, last queued and average GPM. This is OpenDota's public
   peer data, not Steam's private friends list.
 - **Performance review** — hero-benchmarked percentiles for farm, experience,
-  last hits, hero impact, teamfight and survival across the latest standard
-  games. Linked review flags surface repeated farm/impact, death and long-game
-  patterns; Turbo games are excluded and the benchmark source is disclosed.
+  last hits, hero impact, teamfight and survival across the latest ranked
+  standard games. Linked review flags surface repeated farm/impact, death and
+  long-game patterns; Turbo and unranked games are excluded and the benchmark
+  source is disclosed.
 - **Personal draft weighting** — signed-in players can blend their own hero
   pool, sample size and win rate into Draft Lab suggestions, with a toggle and
   visible personal fit on every shortlisted hero.
