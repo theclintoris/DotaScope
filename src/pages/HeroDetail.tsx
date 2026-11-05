@@ -317,8 +317,14 @@ export function HeroDetailPage() {
                     const totalGames = durations.data?.reduce((sum, item) => sum + item.games_played, 0) ?? 1
                     const share = entry.games_played / (totalGames || 1)
                     const wr = entry.games_played ? entry.wins / entry.games_played : 0
+                    // OpenDota reports duration buckets in seconds, not minutes.
+                    const binMinutes = Math.round(entry.duration_bin / 60)
                     return (
-                      <div className="duration-col" key={entry.duration_bin}>
+                      <div
+                        className="duration-col"
+                        key={entry.duration_bin}
+                        title={`${binMinutes} min bracket · ${formatCompact(entry.games_played)} matches · ${formatPercent(wr, 1)} win rate`}
+                      >
                         <span className="duration-wr">{formatPercent(wr, 0)}</span>
                         <span className="duration-bar-track">
                           <span
@@ -326,14 +332,14 @@ export function HeroDetailPage() {
                             style={{ height: `${Math.max(4, share * 240)}%` }}
                           />
                         </span>
-                        <span className="duration-label">{entry.duration_bin} min</span>
+                        <span className="duration-label">{binMinutes}</span>
                         <span className="duration-games">{formatCompact(entry.games_played)}</span>
                       </div>
                     )
                   })}
               </div>
             )}
-            <p className="panel-footnote">Bars show the distribution of match duration; colour marks win rate above or below 50%.</p>
+            <p className="panel-footnote">Duration in minutes; bars show the distribution of match length and colour marks win rate above or below 50%.</p>
           </section>
 
           <section className="panel">

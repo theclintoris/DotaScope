@@ -71,6 +71,7 @@ export interface HeroMatchup {
 }
 
 export interface HeroDuration {
+  /** Bucket duration in seconds, in 5-minute increments. */
   duration_bin: number
   games_played: number
   wins: number
