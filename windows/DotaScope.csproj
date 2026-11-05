@@ -29,6 +29,7 @@
     <NoWarn>$(NoWarn);CA1416</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Launcher.cs" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
     <EmbeddedResource Include="web.zip" LogicalName="DotaScope.web.zip" />
     <EmbeddedResource Include="WebView2Loader.dll" LogicalName="DotaScope.WebView2Loader.dll" />

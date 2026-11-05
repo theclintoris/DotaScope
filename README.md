@@ -9,7 +9,7 @@ A dark, installable statistics cockpit for PC and Android, built on the OpenDota
 
 DotaScope brings hero meta, matchups, professional play, player dossiers, match scoreboards, historical records and a read-only SQL lab into one responsive app. It ships as a native **Android APK**, a **standalone Windows EXE**, and a progressive web app (PWA) for any modern browser.
 
-**[Download the latest build](https://github.com/theclintoris/DotaScope/releases/latest)** · **[Browse the source](https://github.com/theclintoris/DotaScope)**
+**[Download the latest build](https://github.com/theclintoris/DotaScope/releases/latest)** · **[Browse the source](https://github.com/theclintoris/DotaScope)** · **[Update log](CHANGELOG.md)**
 
 ## What is included
 
@@ -26,6 +26,12 @@ DotaScope brings hero meta, matchups, professional play, player dossiers, match 
 - **Records** — twelve historical record books across parsed public matches.
 - **Data Lab** — a read-only OpenDota SQL editor with a table/schema browser, examples, CSV export and a hard 100-row cap.
 - **PWA shell** — install prompt, service worker, offline shell, safe-area mobile navigation, command palette (`Ctrl/⌘ K`) and responsive layouts from 390 px upward.
+
+## Update log
+
+Every shipped change is recorded in **[CHANGELOG.md](CHANGELOG.md)**, including
+the native packaging, Steam integration and stability fixes. Add new work under
+an `Unreleased` heading so the development path stays visible on GitHub.
 
 ## Run locally
 
@@ -64,20 +70,12 @@ The native builds are bundled in this project:
 | File | What it is |
 | --- | --- |
 | `DotaScope-1.0.0.apk` | Signed release APK for Android 7.0+ (minSdk 24, targetSdk 36) |
-| `DotaScope-1.0.0-win-x64.exe` | Self-contained Windows x64 app (about 64 MB). No installer. |
+| `DotaScope-1.0.0-win-x64.exe` | Portable Windows x64 app (about 64 MB). No installer or environment setup. |
 | `DotaScope-1.0.0.zip` | Static web build for the PWA / browser fallback. |
 
-**Windows:** run `DotaScope-1.0.0-win-x64.exe`. Windows SmartScreen may warn because the build is not Authenticode-signed; choose **More info → Run anyway**. The app needs the **Microsoft Edge WebView2 Runtime** (already present on current Windows 10/11 systems). It stores its extracted web assets and window data under `%LOCALAPPDATA%\DotaScope`, falling back to a `data` folder beside the executable if that location is not writable. There is no installer and no Electron runtime.
+**Windows:** run `DotaScope-1.0.0-win-x64.exe`. Windows SmartScreen may warn because the build is not Authenticode-signed; choose **More info → Run anyway**. The app needs the **Microsoft Edge WebView2 Runtime** (already present on current Windows 10/11 systems) and .NET Framework 4.8 (included with Windows 10/11). There is no installer and no Electron runtime.
 
-If Windows reports `Failure processing application bundle` on launch, the .NET single-file host cannot write its extraction cache to `%TEMP%`. Point it at a writable folder and relaunch:
-
-```powershell
-[Environment]::SetEnvironmentVariable(
-  'DOTNET_BUNDLE_EXTRACT_BASE_DIR',
-  "$env:LOCALAPPDATA\DotaScope\bundle",
-  'User'
-)
-```
+The EXE is a portable launcher with the full WebView2 app embedded inside. It chooses a writable data directory (`%LOCALAPPDATA%\DotaScope`, then `%APPDATA%\DotaScope`, then a `data` folder beside the EXE), sets its own extraction paths, and starts the host. You do **not** need to set `DOTNET_BUNDLE_EXTRACT_BASE_DIR` manually. Launching from the installed Steam shortcut uses the same launcher and picks up the active Steam account.
 
 **Android:** enable installing unknown apps for your browser/file manager, open the APK, and confirm the install. It is signed with the project's local release key (CN=DotaScope); this key is not included in the repository. The APK has been signature- and manifest-verified, but was not run on a physical device or emulator in this environment.
 
@@ -145,7 +143,7 @@ For Windows, install **.NET SDK 8 or newer** and run:
 npm run windows:build
 ```
 
-The script builds the web bundle, packs `dist/` into `windows/web.zip`, restores the WebView2 NuGet package using `windows/NuGet.config`, publishes a self-contained single-file host, and writes `DotaScope-1.0.0-win-x64.exe` to the project root. The host is in `windows/`; it serves the embedded `web.zip` through a virtual `https://dotascope.local` origin and renders it with WebView2. It does not use Electron.
+The script builds the web bundle, packs `dist/` into `windows/web.zip`, restores the WebView2 NuGet package using `windows/NuGet.config`, publishes the self-contained WebView2 host to `windows/DotaScope-app.exe`, then wraps it in a small .NET Framework portable launcher and writes `DotaScope-1.0.0-win-x64.exe` to the project root. The host serves the embedded `web.zip` through a virtual `https://dotascope.local` origin and renders it with WebView2. It does not use Electron. The launcher is built with the .NET Framework 4.8 `csc.exe` included with Windows; no Visual Studio install is required.
 
 The Windows binary is unsigned. For public distribution, add an Authenticode code-signing certificate and sign the generated EXE. The Android release key in `android/` is for local sideloading/updates: keep it safe and reuse it for future versions, or replace it with your own production key before publishing.
 
@@ -186,11 +184,13 @@ public/
 windows/
   DotaScope.csproj      WinForms + WebView2 host
   Program.cs            embedded web server, data extraction, window lifecycle
+  Launcher.cs           portable launcher that embeds and starts the host
   icon.ico
 android/        Capacitor 8 Android project (Gradle, signing config)
 assets/         Android adaptive icon + splash source art
 scripts/
-  build-windows.ps1     package dist + publish the Windows EXE
+  build-windows.ps1     package dist + publish the Windows host + launcher
+  build-launcher.ps1    embed the host in the portable EXE
   make-icons.py         regenerate the brand/PWA icons
   make-android-assets.py regenerate adaptive launcher + splash art
   qa-native.mjs         Playwright/CDP native-app smoke test
@@ -208,7 +208,7 @@ Player pages and the general flow were smoke-tested with OpenDota account [`2957
 | `npm run build` | Type-check and build the production app |
 | `npm run preview` | Serve the built app locally |
 | `npm run lint` | Run Oxlint on `src` |
-| `npm run windows:build` | Build and publish the standalone Windows EXE |
+| `npm run windows:build` | Build the Windows host and portable launcher EXE |
 | `npm run android:apk` | Build and sign the release APK |
 | `npm run android:sync` | Rebuild web assets and sync them into Android |
 | `npm run android:open` | Open the Android project in Android Studio |

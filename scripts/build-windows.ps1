@@ -18,7 +18,12 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXIT
 
 $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
 $publishDir = 'windows\bin\Release\net8.0-windows\win-x64\publish'
+$appExe = 'windows\DotaScope-app.exe'
 $target = "DotaScope-$version-win-x64.exe"
-Copy-Item (Join-Path $publishDir 'DotaScope.exe') $target -Force
+Copy-Item (Join-Path $publishDir 'DotaScope.exe') $appExe -Force
+
+Write-Host 'Wrapping app in portable launcher...'
+& (Join-Path $PSScriptRoot 'build-launcher.ps1') -AppExe (Join-Path $root $appExe) -OutFile (Join-Path $root $target)
+if ($LASTEXITCODE -ne 0) { throw "launcher build failed with exit code $LASTEXITCODE" }
 
 Write-Host "Built $target"

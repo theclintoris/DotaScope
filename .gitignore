@@ -33,6 +33,8 @@ windows/bundle-temp/
 windows/data/
 windows/web.zip
 windows/startup.log
+windows/DotaScope-app.exe
+/data/
 
 # Packaging scratch
 .tmp-*
