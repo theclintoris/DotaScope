@@ -81,7 +81,7 @@ export function useTurboHistory(accountId: number | null): TurboHistoryState {
     }
 
     const controller = new AbortController()
-    const timeout = window.setTimeout(() => controller.abort(), 2200)
+    const timeout = window.setTimeout(() => controller.abort(), 6000)
     setLoading(true)
 
     fetch(`${TURBO_HISTORY_ORIGIN}/turbo-history?accountId=${accountId}&limit=2000`, {
