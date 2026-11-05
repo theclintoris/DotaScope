@@ -53,6 +53,9 @@ namespace DotaScopeLauncher
                 string bundle = Path.Combine(root, "bundle");
                 Directory.CreateDirectory(bundle);
                 Environment.SetEnvironmentVariable("DOTASCOPE_DATA_DIR", root);
+                Environment.SetEnvironmentVariable(
+                    "DOTASCOPE_LAUNCH_DIR",
+                    AppDomain.CurrentDomain.BaseDirectory);
                 Log(root, "launcher started");
 
                 Assembly assembly = Assembly.GetExecutingAssembly();

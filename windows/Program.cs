@@ -67,7 +67,15 @@ internal static class Program
         }
 
         Log($"web root ready: {webRoot}");
-        Application.Run(new MainForm(webRoot, dataRoot));
+        WorkerRuntime.Start(dataRoot);
+        try
+        {
+            Application.Run(new MainForm(webRoot, dataRoot));
+        }
+        finally
+        {
+            WorkerRuntime.Stop();
+        }
     }
 
     private static void ConfigureTemp(string dataRoot)

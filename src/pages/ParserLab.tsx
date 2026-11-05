@@ -3,17 +3,20 @@ import {
   AlertTriangle,
   CheckCircle2,
   Cpu,
+  Download,
   ExternalLink,
   FileArchive,
   FolderOpen,
   HardDrive,
   Loader2,
+  PauseCircle,
   Play,
   RefreshCw,
   Server,
   Terminal,
 } from 'lucide-react'
 import { useMeta } from '../context/MetaContext'
+import { useProfile } from '../context/ProfileContext'
 import { useDocumentTitle } from '../lib/hooks'
 import { formatDuration, formatNumber, timeAgoFromIso } from '../lib/format'
 import { HeroPortrait, PageHeader, SectionHeading } from '../components/ui'
@@ -84,6 +87,33 @@ interface ParsedMatch {
   generatedAt: string
 }
 
+interface BackfillResult {
+  matchId: string
+  status: 'parsed' | 'cached' | 'skipped' | 'error'
+  gameMode?: number | null
+  reason?: string
+  error?: string
+}
+
+interface BackfillState {
+  id: string
+  status: 'running' | 'complete' | 'cancelled'
+  startedAt: string
+  finishedAt: string | null
+  total: number
+  completed: number
+  current: string | null
+  results: BackfillResult[]
+}
+
+interface RecentTurboMatch {
+  matchId: string
+  startTime: number
+  duration: number
+  heroId: number
+  win: boolean
+}
+
 const WORKER_BASE = 'http://127.0.0.1:5601'
 
 async function workerGet<T>(path: string): Promise<T> {
@@ -101,6 +131,7 @@ function bytesLabel(bytes: number) {
 export function ParserLabPage() {
   useDocumentTitle('Parser lab')
   const { heroes } = useMeta()
+  const { accountId } = useProfile()
   const heroById = useMemo(() => new Map(heroes.map((hero) => [hero.id, hero])), [heroes])
   const [health, setHealth] = useState<WorkerHealth | null>(null)
   const [replays, setReplays] = useState<ReplayFile[]>([])
@@ -109,6 +140,10 @@ export function ParserLabPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [result, setResult] = useState<ParsedMatch | null>(null)
   const [parsingId, setParsingId] = useState<string | null>(null)
+  const [idsText, setIdsText] = useState('')
+  const [backfill, setBackfill] = useState<BackfillState | null>(null)
+  const [backfillError, setBackfillError] = useState<string | null>(null)
+  const [loadingIds, setLoadingIds] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -131,6 +166,92 @@ export function ParserLabPage() {
   useEffect(() => {
     void load()
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    void workerGet<{ backfill: BackfillState | null }>('/backfill')
+      .then((payload) => {
+        if (!cancelled) setBackfill(payload.backfill)
+      })
+      .catch(() => {
+        // Health/offline state is the more useful message for a missing worker.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (backfill?.status !== 'running') return
+    const timer = window.setInterval(() => {
+      void workerGet<{ backfill: BackfillState | null }>('/backfill')
+        .then((payload) => {
+          setBackfill(payload.backfill)
+          if (payload.backfill?.status !== 'running') void load()
+        })
+        .catch(() => undefined)
+    }, 1500)
+    return () => window.clearInterval(timer)
+  }, [backfill?.id, backfill?.status])
+
+  const loadRecentTurbo = async () => {
+    if (!accountId) {
+      setBackfillError('Pin a player profile first so the worker knows whose history to load.')
+      return
+    }
+    setLoadingIds(true)
+    setBackfillError(null)
+    try {
+      const payload = await workerGet<{ matches: RecentTurboMatch[] }>(
+        `/recent-turbo?accountId=${accountId}`,
+      )
+      if (!payload.matches.length) {
+        setBackfillError('OpenDota returned no recent Turbo matches for this profile.')
+        return
+      }
+      setIdsText(payload.matches.map((match) => match.matchId).join('\n'))
+    } catch (recentError) {
+      setBackfillError(recentError instanceof Error ? recentError.message : 'Could not load recent Turbo matches.')
+    } finally {
+      setLoadingIds(false)
+    }
+  }
+
+  const startBackfill = async () => {
+    const matchIds = [...new Set(
+      idsText
+        .split(/[\s,]+/)
+        .map((value) => value.trim())
+        .filter((value) => /^\d{1,20}$/.test(value)),
+    )]
+    if (!matchIds.length) {
+      setBackfillError('Paste at least one numeric match ID.')
+      return
+    }
+    setBackfillError(null)
+    try {
+      const response = await fetch(`${WORKER_BASE}/backfill`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ matchIds }),
+      })
+      const payload = (await response.json()) as { backfill?: BackfillState; error?: string }
+      if (!response.ok || !payload.backfill) {
+        throw new Error(payload.error ?? 'Could not start the backfill queue.')
+      }
+      setBackfill(payload.backfill)
+    } catch (startError) {
+      setBackfillError(startError instanceof Error ? startError.message : 'Could not start the backfill queue.')
+    }
+  }
+
+  const cancelBackfill = async () => {
+    try {
+      await fetch(`${WORKER_BASE}/backfill/cancel`, { method: 'POST' })
+    } catch {
+      // The polling status will report the final state.
+    }
+  }
 
   const parse = async (matchId: string) => {
     setParsingId(matchId)
@@ -187,6 +308,106 @@ export function ParserLabPage() {
           <Server size={17} />
           <span>Runs on this PC only</span>
           <small>Web and Android can connect when the worker is reachable.</small>
+        </div>
+      </section>
+
+      <section className="panel parser-backfill">
+        <div className="parser-backfill-head">
+          <div>
+            <p className="eyebrow">TURBO BACKFILL</p>
+            <h2>Build the archive while you sleep.</h2>
+            <p>
+              Queue match IDs newest-first. The worker downloads Valve replays when OpenDota has a replay URL,
+              then parses each one locally and extends your Turbo history.
+            </p>
+          </div>
+          <span className={`parser-backfill-pill${backfill?.status === 'running' ? ' is-running' : ''}`}>
+            {backfill?.status === 'running'
+              ? `Running ${backfill.completed}/${backfill.total}`
+              : backfill?.status === 'complete'
+                ? 'Queue complete'
+                : backfill?.status === 'cancelled'
+                  ? 'Queue cancelled'
+                  : 'Queue ready'}
+          </span>
+        </div>
+
+        <div className="parser-backfill-grid">
+          <div className="parser-backfill-input">
+            <label htmlFor="backfill-ids">Match IDs</label>
+            <textarea
+              id="backfill-ids"
+              value={idsText}
+              onChange={(event) => setIdsText(event.target.value)}
+              placeholder={'9077012903\n9074125467\n9074160600'}
+              spellCheck={false}
+              disabled={backfill?.status === 'running'}
+            />
+            <div className="parser-backfill-actions">
+              <button
+                className="btn btn-ghost btn-sm"
+                type="button"
+                onClick={() => void loadRecentTurbo()}
+                disabled={!health || loadingIds || backfill?.status === 'running'}
+              >
+                {loadingIds ? <Loader2 size={14} className="spin" /> : <Download size={14} />}
+                Use latest Turbo sample
+              </button>
+              <button
+                className="btn btn-primary btn-sm"
+                type="button"
+                onClick={() => void startBackfill()}
+                disabled={!health || !idsText.trim() || backfill?.status === 'running'}
+              >
+                <Play size={14} /> Start queue
+              </button>
+              {backfill?.status === 'running' ? (
+                <button className="btn btn-ghost btn-sm" type="button" onClick={() => void cancelBackfill()}>
+                  <PauseCircle size={14} /> Cancel
+                </button>
+              ) : null}
+            </div>
+            <small>
+              OpenDota only lists your latest 20 Turbo matches. Paste IDs from another history source for older
+              games; Valve replay retention is roughly 14 days, so some older matches cannot be recovered.
+            </small>
+            {backfillError ? <p className="parser-error-text"><AlertTriangle size={14} /> {backfillError}</p> : null}
+          </div>
+
+          <div className="parser-backfill-progress">
+            <div className="parser-backfill-progress-head">
+              <span>Queue progress</span>
+              <strong>{backfill ? `${Math.round((backfill.completed / Math.max(backfill.total, 1)) * 100)}%` : '0%'}</strong>
+            </div>
+            <div className="parser-backfill-bar">
+              <span style={{ width: `${backfill ? (backfill.completed / Math.max(backfill.total, 1)) * 100 : 0}%` }} />
+            </div>
+            {backfill?.current ? (
+              <p className="parser-backfill-current">
+                <Loader2 size={13} className="spin" /> Parsing match {backfill.current}…
+              </p>
+            ) : (
+              <p className="parser-backfill-current">
+                {backfill?.status === 'complete'
+                  ? 'Queue finished. New Turbo rows are available in player stats.'
+                  : backfill?.status === 'cancelled'
+                    ? 'Queue stopped before the remaining matches.'
+                    : 'Keep DotaScope and the worker open while the queue runs.'}
+              </p>
+            )}
+            <div className="parser-backfill-results">
+              {backfill?.results.length ? (
+                backfill.results.slice(-8).reverse().map((entry) => (
+                  <span key={`${entry.matchId}-${entry.status}`} className={`parser-backfill-result is-${entry.status}`}>
+                    <strong>{entry.matchId}</strong>
+                    {entry.status === 'skipped' ? 'not Turbo' : entry.status === 'error' ? 'could not parse' : entry.status}
+                  </span>
+                ))
+              ) : (
+                <span className="muted-copy">No queue entries yet.</span>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 

@@ -362,7 +362,7 @@ async function parseReplay(matchId, options = {}) {
   const { force = false, download = false, turboOnly = false } =
     typeof options === 'boolean' ? { force: options } : options
   const match = await openDotaMatch(matchId)
-  if (turboOnly && Number(match?.game_mode) !== 23) {
+  if (turboOnly && match && Number(match.game_mode) !== 23) {
     return {
       skipped: true,
       reason: 'not-turbo',
@@ -459,6 +459,80 @@ function turboHistoryFor(accountId, limit) {
     .slice(0, limit)
 }
 
+const BACKFILL_LIMIT = 500
+let backfillJob = null
+
+async function recentTurboMatches(accountId) {
+  const response = await fetch(`${API_BASE}/players/${accountId}/recentMatches`, {
+    signal: AbortSignal.timeout(20000),
+  })
+  if (!response.ok) throw new Error(`OpenDota recentMatches returned ${response.status}`)
+  const rows = await response.json()
+  if (!Array.isArray(rows)) return []
+  return rows
+    .filter((match) => Number(match?.game_mode) === 23)
+    .map((match) => ({
+      matchId: String(match.match_id),
+      startTime: Number(match.start_time) || 0,
+      duration: Number(match.duration) || 0,
+      heroId: Number(match.hero_id) || 0,
+      win: (Number(match.player_slot) < 128) === Boolean(match.radiant_win),
+    }))
+    .sort((a, b) => b.startTime - a.startTime)
+}
+
+function backfillPayload(job) {
+  if (!job) return null
+  return {
+    id: job.id,
+    status: job.status,
+    startedAt: job.startedAt,
+    finishedAt: job.finishedAt,
+    total: job.matchIds.length,
+    completed: job.completed,
+    current: job.current,
+    results: job.results,
+  }
+}
+
+async function runBackfill(job) {
+  for (const matchId of job.matchIds) {
+    if (job.cancelled) break
+    job.current = matchId
+    try {
+      const result = await parseReplay(matchId, {
+        force: false,
+        download: true,
+        turboOnly: true,
+      })
+      if (result.skipped) {
+        job.results.push({
+          matchId,
+          status: 'skipped',
+          reason: result.reason,
+          gameMode: result.gameMode,
+        })
+      } else {
+        job.results.push({
+          matchId,
+          status: result.cached ? 'cached' : 'parsed',
+          gameMode: result.match?.gameMode ?? 23,
+        })
+      }
+    } catch (error) {
+      job.results.push({
+        matchId,
+        status: 'error',
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+    job.completed += 1
+  }
+  job.current = null
+  job.status = job.cancelled ? 'cancelled' : 'complete'
+  job.finishedAt = new Date().toISOString()
+}
+
 const server = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
@@ -501,6 +575,55 @@ const server = createServer(async (req, res) => {
       const limit = Math.max(1, Math.min(5000, Number(url.searchParams.get('limit') ?? 1000) || 1000))
       const matches = turboHistoryFor(accountId, limit)
       return json(res, 200, { accountId, count: matches.length, matches })
+    }
+
+    if (req.method === 'GET' && url.pathname === '/recent-turbo') {
+      const accountId = Number(url.searchParams.get('accountId') ?? 0) || 0
+      if (!accountId) return json(res, 400, { error: 'accountId is required' })
+      return json(res, 200, { accountId, matches: await recentTurboMatches(accountId) })
+    }
+
+    if (req.method === 'GET' && url.pathname === '/backfill') {
+      return json(res, 200, { backfill: backfillPayload(backfillJob) })
+    }
+
+    if (req.method === 'POST' && url.pathname === '/backfill/cancel') {
+      if (!backfillJob || backfillJob.status !== 'running') {
+        return json(res, 409, { error: 'No backfill is running.' })
+      }
+      backfillJob.cancelled = true
+      return json(res, 202, { backfill: backfillPayload(backfillJob) })
+    }
+
+    if (req.method === 'POST' && url.pathname === '/backfill') {
+      if (backfillJob?.status === 'running') {
+        return json(res, 409, { error: 'A backfill is already running.' })
+      }
+      let body = ''
+      for await (const chunk of req) {
+        body += chunk
+        if (body.length > 2_000_000) throw new Error('Request body too large')
+      }
+      const parsed = body ? JSON.parse(body) : {}
+      const matchIds = [...new Set(
+        (Array.isArray(parsed.matchIds) ? parsed.matchIds : [])
+          .map((value) => safeId(value))
+          .filter(Boolean),
+      )].slice(0, BACKFILL_LIMIT)
+      if (!matchIds.length) return json(res, 400, { error: 'No valid match IDs supplied.' })
+      backfillJob = {
+        id: `backfill-${Date.now()}`,
+        status: 'running',
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        matchIds,
+        completed: 0,
+        current: null,
+        results: [],
+        cancelled: false,
+      }
+      void runBackfill(backfillJob)
+      return json(res, 202, { backfill: backfillPayload(backfillJob) })
     }
 
     if (req.method === 'POST' && url.pathname === '/parse') {

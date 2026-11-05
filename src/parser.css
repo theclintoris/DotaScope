@@ -724,3 +724,230 @@
     min-width: 760px;
   }
 }
+
+.parser-backfill {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+}
+
+.parser-backfill-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.parser-backfill-head h2 {
+  margin: 3px 0 7px;
+  font-family: var(--font-display);
+  font-size: clamp(25px, 2.5vw, 36px);
+  letter-spacing: -0.025em;
+  line-height: 1;
+}
+
+.parser-backfill-head p:not(.eyebrow) {
+  max-width: 720px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.parser-backfill-pill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.parser-backfill-pill.is-running {
+  border-color: rgba(227, 166, 75, 0.4);
+  color: var(--gold);
+  background: rgba(227, 166, 75, 0.08);
+}
+
+.parser-backfill-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.parser-backfill-input {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.parser-backfill-input label {
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.parser-backfill-input textarea {
+  width: 100%;
+  min-height: 104px;
+  resize: vertical;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  outline: none;
+  background: rgba(7, 13, 22, 0.72);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.7;
+}
+
+.parser-backfill-input textarea:focus {
+  border-color: rgba(227, 166, 75, 0.55);
+}
+
+.parser-backfill-input textarea:disabled {
+  opacity: 0.62;
+}
+
+.parser-backfill-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.parser-backfill-input small {
+  color: var(--faint);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.parser-backfill-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.parser-backfill-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.parser-backfill-progress-head strong {
+  color: var(--gold);
+  font-weight: 500;
+}
+
+.parser-backfill-bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.parser-backfill-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #a56b1e, var(--gold));
+  transition: width 220ms ease;
+}
+
+.parser-backfill-current {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 18px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.parser-backfill-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 118px;
+  overflow-y: auto;
+}
+
+.parser-backfill-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 8px;
+}
+
+.parser-backfill-result strong {
+  color: var(--text);
+  font-weight: 400;
+}
+
+.parser-backfill-result.is-parsed,
+.parser-backfill-result.is-cached {
+  border-color: rgba(105, 190, 143, 0.24);
+  color: var(--good);
+}
+
+.parser-backfill-result.is-skipped {
+  border-color: rgba(227, 166, 75, 0.25);
+  color: var(--gold);
+}
+
+.parser-backfill-result.is-error {
+  border-color: rgba(224, 112, 112, 0.26);
+  color: var(--bad);
+}
+
+@media (max-width: 1080px) {
+  .parser-backfill-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .parser-backfill-head {
+    gap: 14px;
+  }
+}
+
+@media (max-width: 620px) {
+  .parser-backfill {
+    padding: 15px;
+  }
+
+  .parser-backfill-head {
+    flex-direction: column;
+  }
+
+  .parser-backfill-actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+}

@@ -46,6 +46,12 @@ All notable changes to DotaScope are recorded here. The public release lives at
 - **Parser lab** — local OpenDota replay parser plus replay shelf, Turbo
   download/decompression, parsed scoreboard and utility stats. Runs entirely
   on the local machine; see the README setup.
+- **Turbo backfill queue** — load the recent Turbo sample or paste match IDs;
+  the worker downloads available Valve replays through OpenDota and parses them
+  newest-first, extending `worker/data/turbo-history.json` without the 20-match
+  cap. Validation is explicit: OpenDota only lists the latest 20 Turbo matches,
+  and older replays may be expired. The queue processes sequentially and is
+  designed to run while DotaScope and the local worker stay open.
 - **Removed Live suggestions** — the GSI cockpit UI was removed as unnecessary.
   The loopback GSI bridge and post-game watcher remain because auto-parse needs
   them; setup now lives under Turbo auto-parse in the README.
@@ -68,6 +74,11 @@ All notable changes to DotaScope are recorded here. The public release lives at
   from the Steam shortcut — focuses the running window instead of starting a second
   WebView2 host against an in-use profile, which previously surfaced a misleading
   `0x8007139F` "requires WebView2" error.
+- The Windows launcher now owns the local parser worker lifecycle: it starts
+  `worker/parser-worker.mjs` when the worker checkout is available and stops the
+  worker it started when DotaScope exits. An externally started worker is reused
+  and left running. The standalone single-file build does not bundle Node, Java,
+  7-Zip, the parser jar or the worker sources.
 
 ## [1.0.0] — 2026-11-05
 

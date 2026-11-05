@@ -53,6 +53,8 @@ curl -X POST http://127.0.0.1:5601/parse \
 
 Parsed data is stored under `worker/data/` and is gitignored. Successful Turbo parses also append normalized player rows to `worker/data/turbo-history.json`, so DotaScope can build a Turbo history longer than OpenDota's 20-match sample. The file is local and is not uploaded.
 
+The Parser lab's **Turbo backfill** queue uses `/recent-turbo` and `/backfill`. It downloads a replay only when OpenDota returns a replay URL; otherwise the match is recorded as an error and the user must download that replay from Dota 2. Valve replay retention is finite, so older matches may no longer be recoverable.
+
 ## Endpoints
 
 | Method | Path | Purpose |
@@ -62,6 +64,10 @@ Parsed data is stored under `worker/data/` and is gitignored. Successful Turbo p
 | POST | `/parse` | Body `{ "matchId": "...", "force": false, "download": false, "turboOnly": false }`; runs the parser, optionally downloading the replay |
 | GET | `/stats/:matchId` | Previously generated stats |
 | GET | `/turbo-history?accountId=&limit=` | Parsed Turbo rows for one account, newest first |
+| GET | `/recent-turbo?accountId=` | OpenDota's latest-20 feed filtered to Turbo |
+| POST | `/backfill` | Body `{ "matchIds": ["..."] }`; queues newest-first Turbo downloads/parses |
+| GET | `/backfill` | Current/last queue progress and per-match results |
+| POST | `/backfill/cancel` | Stops after the current match finishes |
 
 ## Known limitations
 
