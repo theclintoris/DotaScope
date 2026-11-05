@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0e14" />
+    <meta name="color-scheme" content="dark" />
+    <title>DotaScope — Dota 2 Meta Intelligence</title>
+    <meta
+      name="description"
+      content="DotaScope is a fast, installable Dota 2 statistics cockpit: hero win rates, pick trends, matchups, pro meta, player profiles, match scoreboards, records and a live SQL Data Lab powered by OpenDota."
+    />
+    <meta name="author" content="DotaScope" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="DotaScope — Meta Intelligence" />
+    <meta
+      property="og:description"
+      content="Hero trends, matchups, pro meta, player dossiers, match scoreboards and an OpenDota SQL lab — in one installable interface."
+    />
+    <meta name="twitter:card" content="summary" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="DotaScope" />
+    <link rel="preconnect" href="https://api.opendota.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.cloudflare.steamstatic.com" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <div style="padding: 40px; color: #e8e2d5; background: #080b10; font-family: sans-serif">
+        DotaScope needs JavaScript to reach the OpenDota API and render its dashboards.
+      </div>
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

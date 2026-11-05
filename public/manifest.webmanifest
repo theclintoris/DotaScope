@@ -1,0 +1,57 @@
+{
+  "name": "DotaScope — Meta Intelligence",
+  "short_name": "DotaScope",
+  "description": "A fast, installable Dota 2 statistics cockpit powered by the OpenDota public API.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#080b10",
+  "theme_color": "#0b0e14",
+  "categories": ["games", "sports", "utilities"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Hero meta",
+      "short_name": "Heroes",
+      "description": "Browse hero win rates and pick trends",
+      "url": "./#/heroes",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Match explorer",
+      "short_name": "Matches",
+      "description": "Search pro and public matches",
+      "url": "./#/matches",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Data Lab",
+      "short_name": "SQL",
+      "description": "Query the OpenDota archive",
+      "url": "./#/data-lab",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

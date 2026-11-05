@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">DotaScope</string>
+    <string name="title_activity_main">DotaScope</string>
+    <string name="package_name">com.dotascope.app</string>
+    <string name="custom_url_scheme">com.dotascope.app</string>
+</resources>
