@@ -10,8 +10,9 @@ Android and the web, built on the OpenDota public API.
 
 ### Added
 
-- **Eleven data surfaces** — Overview, Heroes, Hero dossier, Matches, Match
-  detail, Players, Player profile, Pro scene, Records, Data Lab and a custom 404.
+- **Twelve data surfaces** — Overview, Heroes, Hero dossier, Draft lab, Matches,
+  Match detail, Players, Player profile, Pro scene, Records, Data Lab and a
+  custom 404.
 - **Global meta lens** — ranked pubs / pro / turbo and Herald–Divine brackets,
   shared by every page and persisted locally.
 - **Hero intelligence** — sortable and filterable hero index, CSV export,
@@ -28,6 +29,11 @@ Android and the web, built on the OpenDota public API.
 - **Squad performance** — public peer history showing frequent teammates, games
   together, duo win rate, last queued and average GPM. This is OpenDota's public
   peer data, not Steam's private friends list.
+- **Draft lab** — a 5v5 counter-pick board. Set both line-ups, filter suggestions
+  by role, and score candidates against the enemy draft. The MMR bracket control
+  reweights heroes with bracket-specific win/pick rates and penalises poor
+  low-bracket win rates; counter matchups themselves use OpenDota's global
+  parsed sample, which is disclosed in the UI.
 - **Pinned profile** — save a public Dota profile locally. The pinned dossier
   appears above the Players directory and as a compact strip on Overview.
 - **Steam account connection** — the Windows app reads the active Steam account

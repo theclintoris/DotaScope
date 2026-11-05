@@ -22,6 +22,7 @@ DotaScope brings hero meta, matchups, professional play, player dossiers, match 
 - **Players** — global OpenDota player search, numeric account shortcut, and a searchable professional directory.
 - **Player profile** — career W/L, rank, estimated MMR, recent form, hero pool, match log, lane mix and attribute comfort.
 - **Player hero dossier** — click any hero in a player's pool or match log for hero-specific win rate, form, KDA, final-item telemetry, recent builds and the full paginated match archive on that hero.
+- **Draft lab** — a 5v5 counter-pick board for both line-ups, with role-filtered suggestions, matchup edges, item-independent meta blends and an MMR bracket guardrail. The bracket control reweights suggestions by that rank's win/pick rates; OpenDota does not publish bracket-split head-to-head samples, which the screen states explicitly.
 - **Squad performance** — a player's most frequent public teammates, with games together, duo win rate, last queued and average GPM, sortable by games or win rate. This uses OpenDota's public peer history, not Steam's private friends list.
 - **Your profile** — pin your own dossier above the Players directory and keep a compact form/record strip on Overview. The Windows app picks up the active Steam account automatically; the web app offers Steam sign-in plus a manual profile fallback.
 - **Pro scene** — team Elo-style power index, active-team filters, latest series results and a pro hero draft-presence board.

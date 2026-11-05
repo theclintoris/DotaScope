@@ -37,6 +37,7 @@ interface PaletteSection {
 const QUICK_LINKS: PaletteAction[] = [
   { id: 'nav-home', title: 'Overview', meta: 'Meta snapshot', icon: <Activity size={16} />, to: '/' },
   { id: 'nav-heroes', title: 'Heroes', meta: 'All heroes, every filter', icon: <Swords size={16} />, to: '/heroes' },
+  { id: 'nav-draft', title: 'Draft lab', meta: 'Counter-pick simulator', icon: <Swords size={16} />, to: '/draft' },
   { id: 'nav-matches', title: 'Matches', meta: 'Pro & public feed', icon: <Swords size={16} />, to: '/matches' },
   { id: 'nav-players', title: 'Players', meta: 'Search any account', icon: <Users size={16} />, to: '/players' },
   { id: 'nav-pro', title: 'Pro scene', meta: 'Teams & pro meta', icon: <Trophy size={16} />, to: '/pro' },
