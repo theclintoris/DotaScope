@@ -29,6 +29,7 @@ import type {
 } from '../types'
 import { useMeta } from '../context/MetaContext'
 import { requestMatchParse, TTL } from '../lib/api'
+import { mergeLocalMatch, useLocalMatchStats } from '../lib/localMatchStats'
 import { useDocumentTitle, useRemote } from '../lib/hooks'
 import { hasOpenDotaKey } from '../lib/settings'
 import {
@@ -60,11 +61,19 @@ export function MatchDetailPage() {
   const { matchId } = useParams()
   const meta = useMeta()
   const detail = useRemote<MatchDetail>(matchId ? `/matches/${matchId}` : null, TTL.detail)
+  const localStats = useLocalMatchStats(matchId)
   const items = useRemote<ItemConstants>('/constants/items', TTL.constants)
   const [chartMode, setChartMode] = useState<'gold' | 'xp'>('gold')
   const [parseState, setParseState] = useState<'idle' | 'requesting' | 'queued' | 'error'>('idle')
   const [parseError, setParseError] = useState<string | null>(null)
-  const match = detail.data
+  const remoteMatch = detail.data
+  const match = useMemo(
+    () => (remoteMatch && localStats.data ? mergeLocalMatch(remoteMatch, localStats.data) : remoteMatch),
+    [remoteMatch, localStats.data],
+  )
+  const localParsed = Boolean(localStats.data?.players?.length)
+  const remoteParsed = Boolean(remoteMatch?.od_data?.has_parsed)
+  const parsed = remoteParsed || localParsed
   useDocumentTitle(match ? `Match #${match.match_id}` : 'Match')
 
   const heroes = useMemo(() => new Map(meta.heroes.map((hero) => [hero.id, hero])), [meta.heroes])
@@ -82,8 +91,6 @@ export function MatchDetailPage() {
       dire: sorted.filter((player) => !player.isRadiant),
     }
   }, [match])
-
-  const parsed = Boolean(match?.od_data?.has_parsed)
 
   const requestParse = async () => {
     if (!match) return
@@ -146,6 +153,7 @@ export function MatchDetailPage() {
             <span className="badge badge-muted">{gameModeName(match.game_mode)}</span>
             <span className="badge badge-muted">{lobbyName(match.lobby_type)}</span>
             {match.patch != null && <span className="badge badge-muted">Patch {match.patch}</span>}
+            {localParsed && <span className="badge badge-local">Parsed locally</span>}
           </div>
           <span className="muted-label">
             <CalendarDays size={13} /> {formatUnixTime(match.start_time)} · {timeAgo(match.start_time)}
@@ -234,8 +242,39 @@ export function MatchDetailPage() {
         ) : (
           <p className="panel-empty">This match has no parsed advantage timeline. The scoreboard below may still be complete.</p>
         )}
-        <p className="panel-footnote">Positive values favour Radiant; negative values favour Dire. Parsed match data from OpenDota.</p>
+        <p className="panel-footnote">
+          Positive values favour Radiant; negative values favour Dire.{' '}
+          {localParsed && !remoteParsed ? 'Advantage timeline from the local replay parser.' : 'Parsed match data from OpenDota.'}
+        </p>
       </section>
+
+      {localParsed && !remoteParsed && (
+        <section className="panel parse-panel local-parse-panel">
+          <SectionHeading
+            eyebrow="Replay intelligence"
+            title="Parsed locally"
+            hint="Local parser data is merged with OpenDota's basic match data"
+            action={<span className="badge badge-local">Local parser</span>}
+          />
+          <div className="parse-panel-body">
+            <div>
+              <p className="muted-copy">
+                DotaScope parsed this replay on this PC. No paid OpenDota API key is required.
+                The scoreboard and vision data below use the local parse; OpenDota still supplies player identities and items.
+              </p>
+              <p className="muted-label">
+                {localStats.loading ? 'Refreshing local stats…' : 'Local worker data is available for this match.'}
+              </p>
+            </div>
+            <div className="parse-panel-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => { localStats.refresh(); detail.refresh() }}>
+                Refresh local parse
+              </button>
+              <Link className="btn btn-ghost" to="/parser">Open Parser lab</Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {!parsed && (
         <section className="panel parse-panel">
@@ -288,7 +327,7 @@ export function MatchDetailPage() {
           hint="Click a player name to open their profile"
           action={
             <span className="muted-label">
-              <Database size={13} /> {match.od_data?.has_parsed ? 'Parsed match' : 'Basic match data'}
+              <Database size={13} /> {localParsed ? 'Parsed locally' : remoteParsed ? 'Parsed match' : 'Basic match data'}
             </span>
           }
         />

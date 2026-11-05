@@ -829,6 +829,12 @@ pre {
   color: var(--accent);
 }
 
+.badge-local {
+  border-color: rgba(75, 205, 140, 0.32);
+  background: rgba(75, 205, 140, 0.1);
+  color: #7fe0b0;
+}
+
 .text-link {
   display: inline-flex;
   align-items: center;

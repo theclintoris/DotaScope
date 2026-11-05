@@ -70,6 +70,12 @@ All notable changes to DotaScope are recorded here. The public release lives at
   follows the global Ranked/Turbo lens and can be filtered to a single hero;
   ranked records page through the account's available ranked history, while
   Turbo combines the latest-20 sample with local parsed history.
+- **Local parsed match detail** — the Match page now fetches the local worker's
+  `/stats` payload, merges parsed player stats by player slot, labels the match
+  **Parsed locally**, fills the scoreboard and Vision & Utility sections, and
+  builds the advantage chart from the worker's per-minute gold/XP timeline. It
+  no longer claims a locally parsed match is unparsed or asks for an OpenDota
+  parsing key.
 
 ### Changed
 

@@ -22,6 +22,17 @@
   margin-top: 9px;
 }
 
+.local-parse-panel {
+  border-color: rgba(75, 205, 140, 0.22);
+  background:
+    linear-gradient(120deg, rgba(75, 205, 140, 0.06), transparent 55%),
+    var(--panel);
+}
+
+.local-parse-panel .parse-panel-body {
+  align-items: flex-start;
+}
+
 .vision-summary {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

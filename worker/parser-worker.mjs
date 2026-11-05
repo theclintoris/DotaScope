@@ -172,6 +172,7 @@ function accountIdFromSteamId(steamId) {
 
 async function summarise(rawPath, matchId) {
   const last = new Map()
+  const timelineBuckets = new Map()
   const playerSlots = new Map()
   const epiloguePlayers = []
   let epilogueDota = null
@@ -212,6 +213,17 @@ async function summarise(rawPath, matchId) {
     } else if (row.type === 'interval' && Number.isFinite(row.slot)) {
       const previous = last.get(row.slot)
       if (!previous || asNumber(row.time) >= asNumber(previous.time)) last.set(row.slot, row)
+      const time = asNumber(row.time)
+      if (time >= 0) {
+        const bucket = Math.floor(time / 60)
+        let entries = timelineBuckets.get(bucket)
+        if (!entries) {
+          entries = new Map()
+          timelineBuckets.set(bucket, entries)
+        }
+        const previousEntry = entries.get(row.slot)
+        if (!previousEntry || time >= asNumber(previousEntry.time)) entries.set(row.slot, row)
+      }
     }
   }
 
@@ -291,6 +303,32 @@ async function summarise(rawPath, matchId) {
   const direKills = players.filter((p) => p.team === 'dire').reduce((sum, p) => sum + p.kills, 0)
   const gameMode = asNumber(match?.game_mode) || asNumber(epilogueDota?.gameMode_)
 
+  const timeline = Array.from(timelineBuckets.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([minute, entries]) => {
+      let radiantGold = 0
+      let direGold = 0
+      let radiantXp = 0
+      let direXp = 0
+      for (const row of entries.values()) {
+        const slot = playerSlots.get(row.slot) ?? row.slot
+        if (slot < 128) {
+          radiantGold += asNumber(row.gold)
+          radiantXp += asNumber(row.xp)
+        } else {
+          direGold += asNumber(row.gold)
+          direXp += asNumber(row.xp)
+        }
+      }
+      return {
+        minute,
+        radiantGold: Math.round(radiantGold),
+        direGold: Math.round(direGold),
+        radiantXp: Math.round(radiantXp),
+        direXp: Math.round(direXp),
+      }
+    })
+
   return {
     match: {
       matchId,
@@ -306,6 +344,7 @@ async function summarise(rawPath, matchId) {
       rawLogLines: lineCount,
     },
     players,
+    timeline,
     generatedAt: new Date().toISOString(),
   }
 }
