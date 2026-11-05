@@ -89,7 +89,7 @@ export function AppShell() {
   const moreActive = MORE_LINKS.some((link) => location.pathname.startsWith(link.to))
 
   useInterval(() => setTick((tick) => tick + 1), 60_000)
-  useLockBodyScroll(moreOpen || installOpen || profileOpen)
+  useLockBodyScroll(moreOpen)
 
   useEffect(() => {
     setMoreOpen(false)

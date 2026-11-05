@@ -98,13 +98,22 @@ export function useDocumentTitle(title: string) {
   }, [title])
 }
 
+let bodyScrollLocks = 0
+let previousBodyOverflow = ''
+
 export function useLockBodyScroll(locked: boolean) {
   useEffect(() => {
     if (!locked) return
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    if (bodyScrollLocks === 0) {
+      previousBodyOverflow = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+    }
+    bodyScrollLocks += 1
     return () => {
-      document.body.style.overflow = previous
+      bodyScrollLocks = Math.max(0, bodyScrollLocks - 1)
+      if (bodyScrollLocks === 0) {
+        document.body.style.overflow = previousBodyOverflow
+      }
     }
   }, [locked])
 }
