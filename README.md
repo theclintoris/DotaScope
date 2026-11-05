@@ -31,7 +31,7 @@ DotaScope brings hero meta, matchups, professional play, player dossiers, match 
 - **Squad performance** — a player's most frequent public teammates, with games together, duo win rate, last queued and average GPM, sortable by games or win rate. This uses OpenDota's public peer history, not Steam's private friends list.
 - **Your profile** — pin your own dossier above the Players directory and keep a compact form/record strip on Overview. The Windows app picks up the active Steam account automatically; the web app offers Steam sign-in plus a manual profile fallback.
 - **Pro scene** — team Elo-style power index, active-team filters, latest series results and a pro hero draft-presence board.
-- **Records** — twelve historical record books across parsed public matches.
+- **Records** — twelve historical record books across parsed public matches, plus **personal records** for your pinned profile. Personal bests follow the Ranked/Turbo lens and can be narrowed to one hero; ranked scans all available ranked match history, while Turbo combines OpenDota’s sample with locally parsed history.
 - **Data Lab** — a read-only OpenDota SQL editor with a table/schema browser, examples, CSV export and a hard 100-row cap.
 - **PWA shell** — install prompt, service worker, offline shell, safe-area mobile navigation, command palette (`Ctrl/⌘ K`) and responsive layouts from 390 px upward.
 
@@ -211,7 +211,7 @@ Dotabuff does not publish a general public API. **This is not a pixel-for-pixel 
 - **Rate limits** — OpenDota's free tier is roughly 60 requests/minute per IP, with a daily cap. A first uncached visit fires several requests. When the API returns `429`, DotaScope shows a retry state; browse after a minute or use the cached data already stored locally.
 - **Hero brackets** — OpenDota `/heroStats` publishes bracket aggregates 1–7 but no usable Immortal (bracket 8) sample. DotaScope's **Immortal** lens is a separate weekly Spectral sample, not an OpenDota bracket. OpenDota's overall bracket win rates can sit at exactly 50% because of how the feed is normalized; per-hero rates still vary.
 - **Pro data** — the pro feed is the latest ~100 matches, not a complete circuit archive. Some fields Dotabuff shows (notably game mode for pro matches) are absent, so DotaScope does not invent them.
-- **Records** — only parsed public matches. Unparsed and private games are excluded.
+- **Records** — the global record books use parsed public matches; unparsed and private games are excluded. Personal ranked records scan the account’s ranked match list returned by OpenDota; Turbo records use the latest-20 public sample plus every local parsed Turbo game. GPM/XPM/last-hit/hero-damage personal records therefore appear only for parsed Turbo games.
 - **Friends / squad** — Steam does not expose a player's private friend list to a client-only OpenDota app. DotaScope shows OpenDota's public `peers` history instead (the people you queue with most) and labels it honestly.
 - **Public feed** — the latest 100 matches; direct match-ID lookup is available for older games.
 - **Parsing** — some matches are unparsed, so items, drafts and economy charts can be incomplete. Bring your own OpenDota API key to request a replay parse from the match page; OpenDota handles the queue and the paid feature. Item/ability constants come from OpenDota/Valve.

@@ -58,6 +58,12 @@ All notable changes to DotaScope are recorded here. The public release lives at
 - **Automatic Turbo parsing** — while DotaScope is open on Windows, the
   post-game GSI state triggers a background parse of the finished Turbo match
   when the local worker is running, with a progress toast and Parser lab link.
+- **Personal record books** — the Records page now surfaces the pinned
+  profile's best kills, deaths, assists, KDA, longest game, longest win streak,
+  and (for parsed Turbo games) GPM/XPM/last hits/hero damage. The book follows
+  the global Ranked/Turbo lens and can be filtered to a single hero; ranked
+  records page through the account's available ranked history, while Turbo
+  combines the latest-20 sample with local parsed history.
 
 ### Changed
 
