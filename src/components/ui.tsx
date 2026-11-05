@@ -304,7 +304,7 @@ export function Sparkline({
 
 export function TrendDelta({
   value,
-  suffix = 'wk',
+  suffix = 'd',
   neutralLabel = 'flat',
 }: {
   value: number | null | undefined

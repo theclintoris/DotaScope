@@ -43,6 +43,7 @@ import {
   TrendDelta,
   WinRate,
 } from '../components/ui'
+import { ProfileStrip } from '../components/ProfilePanels'
 
 const ATTR_COLORS: Record<string, string> = {
   str: 'var(--attr-str)',
@@ -133,6 +134,8 @@ export function OverviewPage() {
           </>
         }
       />
+
+      <ProfileStrip />
 
       <div className="kpi-grid">
         <KpiCard
@@ -306,10 +309,10 @@ export function OverviewPage() {
         <section className="panel">
           <div className="panel-head">
             <div>
-              <span className="eyebrow">7-day shift</span>
+              <span className="eyebrow">Daily shift</span>
               <h3>Trending picks</h3>
             </div>
-            <span className="panel-chip">Δ vs last week</span>
+            <span className="panel-chip">Δ vs prior day</span>
           </div>
           <div className="trend-list">
             {derived.trending.map((metric) => (
@@ -456,7 +459,7 @@ export function OverviewPage() {
                 <th>Pick share</th>
                 <th className="num">Picks</th>
                 <th className="num">Pro picks</th>
-                <th>7-day</th>
+                <th>Daily</th>
                 <th />
               </tr>
             </thead>

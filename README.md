@@ -14,11 +14,12 @@ DotaScope brings hero meta, matchups, professional play, player dossiers, match 
 - **Meta lens** — switch between ranked pubs, pro and turbo populations, and ranked brackets 1–7. The choice is shared across every page and remembered locally.
 - **Overview** — sample size, meta leader, win-rate extremes, pick pressure, trend chart, bracket/attribute distribution and the latest pro results.
 - **Hero index** — search and filter by attribute, role, attack type and Captain's Mode eligibility; sort by win rate, pick share, picks, trend, meta score or pro presence; export CSV.
-- **Hero dossier** — matchups, duration profile, item phases, bracket spread, pro pick/ban presence, weekly pick history and base stats.
+- **Hero dossier** — matchups, duration profile, item phases, bracket spread, pro pick/ban presence, daily pick history and base stats.
 - **Matches** — the latest pro and public feeds with league, team, mode, lobby, rank, duration and time filters. Direct match-ID lookup.
 - **Match detail** — gold/XP advantage chart, both scoreboards, items, KDA, GPM/XPM, last hits/denies, damage and a pick/ban draft board.
 - **Players** — global OpenDota player search, numeric account shortcut, and a searchable professional directory.
 - **Player profile** — career W/L, rank, estimated MMR, recent form, hero pool, match log, lane mix and attribute comfort.
+- **Your profile** — pin your own dossier above the Players directory and keep a compact form/record strip on Overview. The Windows app picks up the active Steam account automatically; the web app offers Steam sign-in plus a manual profile fallback.
 - **Pro scene** — team Elo-style power index, active-team filters, latest series results and a pro hero draft-presence board.
 - **Records** — twelve historical record books across parsed public matches.
 - **Data Lab** — a read-only OpenDota SQL editor with a table/schema browser, examples, CSV export and a hard 100-row cap.
@@ -101,9 +102,21 @@ The interface also runs normally in Zen and other current browsers. One-click in
 
 For LAN testing from a phone, `npm run preview -- --host 0.0.0.0` works, but HTTP origins other than localhost are not installable as PWAs.
 
+## Steam sign-in and your pinned profile
+
+Your selected profile is stored only on the device (`localStorage`). It appears first under **Players** and as a compact strip on **Overview**.
+
+- **Windows app:** the WebView2 host reads the active Steam account from the local Steam client's `config/loginusers.vdf` and passes its public SteamID to the app. Launching DotaScope from Steam therefore pins your Dota dossier automatically. No password is read or requested.
+- **Web / PWA:** **Sign in with Steam** opens Steam's OpenID page. After Steam redirects back, DotaScope uses the returned public SteamID to find the matching OpenDota account. Because the app is fully static and has no backend, this is a public profile link, not a verified secure session. Manual Steam-profile, SteamID64 or Dota account-ID entry is also available.
+- **Android:** there is no local Steam client to read, so use manual profile entry. The APK has no account password or private Steam data access.
+
+The app never asks for a Steam password, Steam Guard code, API key, or private inventory data. OpenDota profiles must be public.
+
 ## Steam library artwork
 
 `steam-art/` contains a complete custom Steam library kit for the Windows app: a 600×900 library portrait, a 920×430 header, a clean 1920×620 hero, a transparent logo, a 256×256 icon, and a multi-size `.ico`. The icon and artwork use Ancient Apparition's **Shattered Sanity** Immortal set from Dota 2's Trove of Terror.
+
+![DotaScope Steam artwork](steam-art/steam-preview.jpg)
 
 On Windows, after building `DotaScope-1.0.0-win-x64.exe`, install the shortcut and artwork with:
 
@@ -140,7 +153,7 @@ The Windows binary is unsigned. For public distribution, add an Authenticode cod
 
 ## Data source and honest limits
 
-DotaScope uses the [OpenDota API](https://docs.opendota.com/). The app has no backend and no account system; requests go from your browser directly to OpenDota. Responses are cached in memory and `localStorage`, with stale-cache fallback when the network is unavailable.
+DotaScope uses the [OpenDota API](https://docs.opendota.com/). The app has no backend and no DotaScope account or password system; requests go from your client directly to OpenDota, and the optional pinned profile is stored only on the device. Responses are cached in memory and `localStorage`, with stale-cache fallback when the network is unavailable.
 
 Dotabuff does not publish a general public API. **This is not a pixel-for-pixel or data-complete clone of Dotabuff.** OpenDota exposes a large, but different and sometimes smaller, slice of Dota data. In particular:
 
@@ -159,9 +172,9 @@ DotaScope is an unofficial fan project. It is not affiliated with Valve, Dotabuf
 
 ```text
 src/
-  components/   app shell, command palette, meta lens, UI primitives
-  context/      global population + bracket state
-  lib/          OpenDota client, cache, formatters, meta calculations, PWA registration
+  components/   app shell, profile panels/dialog, command palette, meta lens, UI primitives
+  context/      global population + bracket state, local profile store
+  lib/          OpenDota client, cache, formatters, meta calculations, Steam helpers, PWA registration
   pages/        Overview, Heroes, HeroDetail, Matches, MatchDetail,
                 Players, PlayerDetail, Pro, Records, DataLab, NotFound
 public/

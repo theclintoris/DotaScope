@@ -11,6 +11,21 @@ function numericArray(hero: HeroStat, field: string): number[] {
   return value.filter((entry): entry is number => typeof entry === 'number')
 }
 
+/**
+ * OpenDota's trend arrays include the current UTC day as the final bucket.
+ * Early in the day that bucket is only a few percent complete, which makes
+ * every hero look like it collapsed. Drop it when it is clearly partial and
+ * compare complete days instead.
+ */
+function completeDayTrend(hero: HeroStat, field: string): number[] {
+  const trend = numericArray(hero, field)
+  if (trend.length < 3) return trend
+  const latest = trend[trend.length - 1]
+  const complete = trend.slice(0, -1).sort((a, b) => a - b)
+  const median = complete[Math.floor(complete.length / 2)]
+  return median > 0 && latest < median * 0.35 ? trend.slice(0, -1) : trend
+}
+
 export function getPickWin(hero: HeroStat, population: Population, bracket: number) {
   if (population === 'pro') {
     return { picks: hero.pro_pick ?? 0, wins: hero.pro_win ?? 0 }
@@ -36,9 +51,9 @@ export function buildHeroMetrics(
     const { picks, wins } = getPickWin(hero, population, bracket)
     let pickTrend: number[] = []
     if (population === 'turbo') {
-      pickTrend = numericArray(hero, 'turbo_picks_trend')
+      pickTrend = completeDayTrend(hero, 'turbo_picks_trend')
     } else if (population === 'ranked' && bracket === 0) {
-      pickTrend = numericArray(hero, 'pub_pick_trend')
+      pickTrend = completeDayTrend(hero, 'pub_pick_trend')
     }
     return { hero, picks, wins, pickTrend }
   })

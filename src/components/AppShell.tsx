@@ -6,6 +6,7 @@ import {
   Database,
   Download,
   LayoutDashboard,
+  LogIn,
   Medal,
   Menu,
   MonitorDown,
@@ -21,12 +22,15 @@ import {
 } from 'lucide-react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useMeta } from '../context/MetaContext'
+import { useProfile } from '../context/ProfileContext'
 import { useInstallPrompt, useInterval, useLockBodyScroll, useOnlineStatus } from '../lib/hooks'
 import { classNames, timeAgo } from '../lib/format'
 import { Brand } from './Brand'
 import { MetaLens } from './MetaLens'
 import { CommandPalette } from './CommandPalette'
 import { InstallDialog } from './InstallDialog'
+import { ProfileDialog } from './ProfileDialog'
+import { PlayerAvatar, RankBadge } from './ui'
 
 const NAV = [
   { to: '/', label: 'Overview', icon: Activity, end: true },
@@ -74,16 +78,18 @@ export function AppShell() {
   const navigate = useNavigate()
   const online = useOnlineStatus()
   const meta = useMeta()
+  const { accountId, profile, connecting: profileConnecting, error: profileError } = useProfile()
   const { canInstall, installed, install } = useInstallPrompt()
   const [commandOpen, setCommandOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [installOpen, setInstallOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [, setTick] = useState(0)
   const section = resolveSection(location.pathname)
   const moreActive = MORE_LINKS.some((link) => location.pathname.startsWith(link.to))
 
   useInterval(() => setTick((tick) => tick + 1), 60_000)
-  useLockBodyScroll(moreOpen || installOpen)
+  useLockBodyScroll(moreOpen || installOpen || profileOpen)
 
   useEffect(() => {
     setMoreOpen(false)
@@ -140,6 +146,35 @@ export function AppShell() {
 
           <div className="sidebar-rule" />
           <MetaLens />
+
+          <div className="sidebar-rule" />
+          <div className="sidebar-account">
+            <span className="sidebar-label">Profile</span>
+            {profile && accountId ? (
+              <Link className="sidebar-profile" to={`/players/${accountId}`}>
+                <PlayerAvatar src={profile.profile.avatarfull} name={profile.profile.personaname} size="sm" />
+                <span className="sidebar-profile-copy">
+                  <strong>{profile.profile.personaname}</strong>
+                  <small>Open my dossier</small>
+                </span>
+                <RankBadge rankTier={profile.rank_tier} size="sm" />
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className="sidebar-signin"
+                onClick={() => setProfileOpen(true)}
+                disabled={profileConnecting}
+              >
+                <span className="sidebar-signin-icon"><LogIn size={16} /></span>
+                <span>
+                  <strong>{profileConnecting ? 'Syncing Steam…' : 'Sign in with Steam'}</strong>
+                  <small>Pin your dossier to the top</small>
+                </span>
+              </button>
+            )}
+            {profileError ? <span className="sidebar-profile-error">{profileError}</span> : null}
+          </div>
 
           <div className="sidebar-rule" />
           <div className="sidebar-install">
@@ -294,6 +329,7 @@ export function AppShell() {
       </nav>
 
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} />
+      <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
       <InstallDialog
         open={installOpen}
         onClose={() => setInstallOpen(false)}
@@ -323,6 +359,35 @@ export function AppShell() {
             </div>
 
             <div className="sheet-scroll">
+              <div className="sheet-account">
+                {profile && accountId ? (
+                  <Link className="sheet-profile" to={`/players/${accountId}`} onClick={() => setMoreOpen(false)}>
+                    <PlayerAvatar src={profile.profile.avatarfull} name={profile.profile.personaname} size="md" />
+                    <span>
+                      <span className="eyebrow">PINNED PROFILE</span>
+                      <strong>{profile.profile.personaname}</strong>
+                      <small>Open my dossier</small>
+                    </span>
+                    <RankBadge rankTier={profile.rank_tier} size="sm" />
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    className="sheet-signin"
+                    onClick={() => {
+                      setMoreOpen(false)
+                      setProfileOpen(true)
+                    }}
+                  >
+                    <LogIn size={18} />
+                    <span>
+                      <strong>{profileConnecting ? 'Syncing Steam…' : 'Sign in with Steam'}</strong>
+                      <small>Pin your public profile to Players</small>
+                    </span>
+                  </button>
+                )}
+              </div>
+
               <div className="sheet-links">
                 {MORE_LINKS.map((link) => {
                   const Icon = link.icon

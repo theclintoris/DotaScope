@@ -29,6 +29,7 @@ import {
   SectionHeading,
   TeamBadge,
 } from '../components/ui'
+import { YourProfilePanel } from '../components/ProfilePanels'
 
 type DirectorySort = 'recent' | 'name' | 'team'
 
@@ -123,6 +124,8 @@ export function PlayersPage() {
         title="Player directory"
         description="Search any Dota account by name or account ID, inspect professional rosters, and open a full career dossier with hero pool and recent form."
       />
+
+      <YourProfilePanel />
 
       <section className="player-search-panel">
         <div className="player-search-copy">

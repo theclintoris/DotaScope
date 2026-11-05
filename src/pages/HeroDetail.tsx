@@ -230,14 +230,14 @@ export function HeroDetailPage() {
         </div>
         <div className="kpi-card kpi-accent">
           <div className="kpi-top">
-            <span className="kpi-label">7-day movement</span>
+            <span className="kpi-label">Daily movement</span>
             <ChartNoAxesCombined size={16} className="kpi-icon" />
           </div>
           <div className="kpi-value">
-            <TrendDelta value={metric?.trendDelta} suffix="picks" neutralLabel="—" />
+            <TrendDelta value={metric?.trendDelta} neutralLabel="—" />
           </div>
           <div className="kpi-foot">
-            <span>{trend.length ? `${trend.length}-week pick history` : 'No weekly series'}</span>
+            <span>{trend.length ? `${trend.length}-day pick history` : 'No daily series'}</span>
           </div>
         </div>
       </div>
@@ -437,7 +437,7 @@ export function HeroDetailPage() {
           </section>
 
           <section className="panel">
-            <SectionHeading eyebrow="Momentum" title={`${trend.length || 7}-week pick pulse`} />
+            <SectionHeading eyebrow="Momentum" title={`${trend.length || 7}-day pick pulse`} />
             {trend.length ? (
               <>
                 <div className="week-bars">
@@ -448,7 +448,7 @@ export function HeroDetailPage() {
                         style={{ height: `${Math.max(6, (value / trendMax) * 100)}%` }}
                         title={`${formatNumber(value)} picks`}
                       />
-                      <span className="week-label">{index === trend.length - 1 ? 'Now' : `W-${trend.length - 1 - index}`}</span>
+                      <span className="week-label">{index === trend.length - 1 ? 'Last day' : `D-${trend.length - 1 - index}`}</span>
                     </div>
                   ))}
                 </div>
@@ -458,9 +458,9 @@ export function HeroDetailPage() {
                 </div>
               </>
             ) : (
-              <p className="panel-empty">Weekly pick trends are not exposed for this population.</p>
+              <p className="panel-empty">Daily pick trends are not exposed for this population.</p>
             )}
-            <p className="panel-footnote">OpenDota's weekly series covers the last seven buckets for ranked all-bracket and Turbo samples.</p>
+            <p className="panel-footnote">OpenDota's daily series for ranked all-bracket and Turbo samples. Today's partial bucket is excluded.</p>
           </section>
 
           <section className="panel">

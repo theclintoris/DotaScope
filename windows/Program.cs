@@ -3,7 +3,9 @@ using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using Microsoft.Web.WebView2.Core;
+using Microsoft.Win32;
 using Microsoft.Web.WebView2.WinForms;
 
 namespace DotaScope;
@@ -345,7 +347,7 @@ internal sealed class MainForm : Form
                     : core.DocumentTitle;
             };
 
-            core.Navigate(ProgramStartUrl);
+            core.Navigate(BuildStartUrl());
         }
         catch (Exception ex)
         {
@@ -362,7 +364,61 @@ internal sealed class MainForm : Form
     }
 
     private const string ProgramHost = "dotascope.local";
-    private const string ProgramStartUrl = "https://dotascope.local/index.html?runtime=desktop#/";
+
+    private static string BuildStartUrl()
+    {
+        string url = "https://dotascope.local/index.html?runtime=desktop";
+        try
+        {
+            string? steamId64 = ReadSteamId64();
+            if (!string.IsNullOrWhiteSpace(steamId64))
+            {
+                url += "&steamid64=" + Uri.EscapeDataString(steamId64);
+                Program.Log($"steam account detected: {steamId64}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Program.Log("steam account detection failed: " + ex.GetType().Name);
+        }
+        return url + "#/";
+    }
+
+    private static string? ReadSteamId64()
+    {
+        string? steamPath = Registry.GetValue(
+            @"HKEY_CURRENT_USER\Software\Valve\Steam",
+            "SteamPath",
+            null) as string;
+        if (string.IsNullOrWhiteSpace(steamPath))
+        {
+            steamPath = @"C:\Program Files (x86)\Steam";
+        }
+
+        string loginUsers = Path.Combine(steamPath, "config", "loginusers.vdf");
+        if (!File.Exists(loginUsers))
+        {
+            Program.Log("Steam loginusers.vdf not found");
+            return null;
+        }
+
+        string text = File.ReadAllText(loginUsers);
+        MatchCollection blocks = Regex.Matches(
+            text,
+            "\"([0-9]{17})\"\\s*\\{(?<body>[^}]*)\\}",
+            RegexOptions.Singleline);
+        string? fallback = null;
+        foreach (Match block in blocks)
+        {
+            fallback ??= block.Groups[1].Value;
+            string body = block.Groups["body"].Value;
+            if (Regex.IsMatch(body, "\"MostRecent\"\\s*\"1\""))
+            {
+                return block.Groups[1].Value;
+            }
+        }
+        return fallback;
+    }
 
     private static bool IsAppUrl(string? url)
     {

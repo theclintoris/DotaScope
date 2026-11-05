@@ -1,5 +1,6 @@
 import { HashRouter, Route, Routes } from 'react-router-dom'
 import { MetaProvider } from './context/MetaContext'
+import { ProfileProvider } from './context/ProfileContext'
 import { AppShell, ScrollToTop } from './components/AppShell'
 import { OverviewPage } from './pages/Overview'
 import { HeroesPage } from './pages/Heroes'
@@ -15,26 +16,28 @@ import { NotFoundPage } from './pages/NotFound'
 
 function App() {
   return (
-    <MetaProvider>
-      <HashRouter>
-        <ScrollToTop />
-        <Routes>
-          <Route element={<AppShell />}>
-            <Route index element={<OverviewPage />} />
-            <Route path="heroes" element={<HeroesPage />} />
-            <Route path="heroes/:heroId" element={<HeroDetailPage />} />
-            <Route path="matches" element={<MatchesPage />} />
-            <Route path="matches/:matchId" element={<MatchDetailPage />} />
-            <Route path="players" element={<PlayersPage />} />
-            <Route path="players/:playerId" element={<PlayerDetailPage />} />
-            <Route path="pro" element={<ProPage />} />
-            <Route path="records" element={<RecordsPage />} />
-            <Route path="data-lab" element={<DataLabPage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Route>
-        </Routes>
-      </HashRouter>
-    </MetaProvider>
+    <ProfileProvider>
+      <MetaProvider>
+        <HashRouter>
+          <ScrollToTop />
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route index element={<OverviewPage />} />
+              <Route path="heroes" element={<HeroesPage />} />
+              <Route path="heroes/:heroId" element={<HeroDetailPage />} />
+              <Route path="matches" element={<MatchesPage />} />
+              <Route path="matches/:matchId" element={<MatchDetailPage />} />
+              <Route path="players" element={<PlayersPage />} />
+              <Route path="players/:playerId" element={<PlayerDetailPage />} />
+              <Route path="pro" element={<ProPage />} />
+              <Route path="records" element={<RecordsPage />} />
+              <Route path="data-lab" element={<DataLabPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
+          </Routes>
+        </HashRouter>
+      </MetaProvider>
+    </ProfileProvider>
   )
 }
 

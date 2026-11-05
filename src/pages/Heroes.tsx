@@ -41,7 +41,7 @@ const COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
   { key: 'winRate', label: 'Win rate', numeric: true },
   { key: 'pickRate', label: 'Pick share', numeric: true },
   { key: 'picks', label: 'Picks', numeric: true },
-  { key: 'trend', label: '7-day trend', numeric: true },
+  { key: 'trend', label: 'Daily trend', numeric: true },
   { key: 'metaScore', label: 'Meta score', numeric: true },
   { key: 'pro', label: 'Pro presence', numeric: true },
 ]
