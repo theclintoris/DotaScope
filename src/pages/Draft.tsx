@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Link } from 'react-router-dom'
 import {
   ChevronRight,
   Crosshair,
@@ -13,14 +14,15 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import type { HeroMatchup, HeroMetric, HeroStat } from '../types'
+import type { HeroMatchup, HeroMetric, HeroStat, PlayerHero } from '../types'
 import { useMeta } from '../context/MetaContext'
-import { fetchHeroMatchups } from '../lib/api'
+import { useProfile } from '../context/ProfileContext'
+import { fetchHeroMatchups, TTL } from '../lib/api'
 import { HERO_ROLES, RANKS } from '../lib/constants'
-import { useDocumentTitle, useLockBodyScroll } from '../lib/hooks'
+import { useDocumentTitle, useLockBodyScroll, useRemote } from '../lib/hooks'
 import { buildHeroMetrics } from '../lib/meta'
 import { classNames, formatNumber, formatPercent } from '../lib/format'
-import { ErrorState, HeroPortrait, PageHeader, PageLoader } from '../components/ui'
+import { ErrorState, HeroPortrait, PageHeader, PageLoader, PlayerAvatar } from '../components/ui'
 
 type TeamSide = 'ally' | 'enemy'
 type RoleFilter = 'all' | (typeof HERO_ROLES)[number]
@@ -35,6 +37,7 @@ interface Suggestion {
   score: number
   counterEdge: number
   sample: number
+  personal: { games: number; winRate: number } | null
   edges: {
     enemy: HeroStat
     games: number
@@ -60,6 +63,16 @@ function filled<T>(value: T | null): value is T {
 export function DraftPage() {
   useDocumentTitle('Draft lab')
   const { heroes, bracket, setBracket, loading, error, refresh } = useMeta()
+  const { accountId, profile } = useProfile()
+  const myHeroes = useRemote<PlayerHero[]>(
+    accountId ? `/players/${accountId}/heroes` : null,
+    TTL.player,
+  )
+  const [personalFit, setPersonalFit] = useState(true)
+  const personalPool = useMemo(
+    () => new Map((myHeroes.data ?? []).map((hero) => [hero.hero_id, hero])),
+    [myHeroes.data],
+  )
   const [allyPicks, setAllyPicks] = useState<(HeroStat | null)[]>(emptyTeam)
   const [enemyPicks, setEnemyPicks] = useState<(HeroStat | null)[]>(emptyTeam)
   const [picker, setPicker] = useState<HeroSlot | null>(null)
@@ -175,9 +188,16 @@ export function DraftPage() {
         const metaEdge = (metric.metaScore - 50) / 50
         const baseEdge = metric.winRate - 0.5
         const bracketLift = bracket > 0 ? Math.max(0, 0.485 - metric.winRate) * 220 : 0
+        const mine = personalPool.get(metric.hero.id)
+        const personalGames = mine?.games ?? 0
+        const personalWinRate = personalGames ? (mine?.win ?? 0) / personalGames : null
+        const personalEdge = personalWinRate != null
+          ? (personalWinRate - 0.5) * Math.min(1, personalGames / 25)
+          : 0
+        const comfortLift = personalFit && personalWinRate != null ? personalEdge * 70 : 0
         const rawScore = enemyHeroes.length
-          ? 50 + counterEdge * 260 + metaEdge * 9 + baseEdge * 26 - bracketLift
-          : metric.metaScore - bracketLift
+          ? 50 + counterEdge * 260 + metaEdge * 9 + baseEdge * 26 - bracketLift + comfortLift
+          : metric.metaScore - bracketLift + comfortLift
         const score = Math.max(1, Math.min(99, Math.round(rawScore)))
         const sample = edges.reduce((sum, edge) => sum + edge.games, 0)
 
@@ -186,12 +206,13 @@ export function DraftPage() {
           score,
           counterEdge,
           sample,
+          personal: personalWinRate != null ? { games: personalGames, winRate: personalWinRate } : null,
           edges: edges.sort((a, b) => b.advantage - a.advantage),
         }
       })
       .sort((a, b) => b.score - a.score || b.metric.metaScore - a.metric.metaScore)
       .slice(0, 12)
-  }, [allyPicks, enemyPicks, matchupData, draftMetrics, bracket, roleFilter])
+  }, [allyPicks, enemyPicks, matchupData, draftMetrics, bracket, roleFilter, personalPool, personalFit])
 
   const pickerHero = picker
     ? (picker.side === 'ally' ? allyPicks[picker.index] : enemyPicks[picker.index])
@@ -360,6 +381,39 @@ export function DraftPage() {
             <span className="draft-suggest-count">{suggestions.length} shown</span>
           </div>
 
+          {accountId ? (
+            <label className="draft-personal-switch">
+              <input
+                type="checkbox"
+                checked={personalFit}
+                onChange={(event) => setPersonalFit(event.target.checked)}
+              />
+              <PlayerAvatar
+                src={profile?.profile.avatarfull}
+                name={profile?.profile.personaname}
+                size="xs"
+              />
+              <span className="draft-personal-copy">
+                <strong>Weight by my hero pool</strong>
+                <small>
+                  {myHeroes.loading
+                    ? 'Loading your comfort picks…'
+                    : `${profile?.profile.personaname ?? 'Your profile'} · ${myHeroes.data?.length ?? 0} heroes played`}
+                </small>
+              </span>
+              <span className="draft-personal-state">{personalFit ? 'On' : 'Off'}</span>
+            </label>
+          ) : (
+            <Link to="/players" className="draft-personal-switch is-link">
+              <Users size={15} />
+              <span className="draft-personal-copy">
+                <strong>Weight suggestions by your hero pool</strong>
+                <small>Sign in from the player directory to use personal fit.</small>
+              </span>
+              <ChevronRight size={15} />
+            </Link>
+          )}
+
           <div className="draft-bracket-row">
             <label htmlFor="draft-bracket">MMR bracket</label>
             <div className="select-wrap select-sm">
@@ -436,6 +490,11 @@ export function DraftPage() {
                         <span className="draft-bracket-wr">
                           {formatPercent(suggestion.metric.winRate, 1)} WR · {formatNumber(suggestion.metric.picks)}
                         </span>
+                        {suggestion.personal ? (
+                          <span className={classNames('draft-personal-stat', personalFit && 'is-weighted')}>
+                            You: {formatNumber(suggestion.personal.games)} games · {formatPercent(suggestion.personal.winRate, 1)}
+                          </span>
+                        ) : null}
                       </div>
                       {suggestion.edges.length ? (
                         <div className="draft-edge-row">

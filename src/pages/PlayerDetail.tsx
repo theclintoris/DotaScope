@@ -52,6 +52,7 @@ import {
   SectionHeading,
   WinRate,
 } from '../components/ui'
+import { PerformanceReview } from '../components/PerformanceReview'
 
 type HeroSort = 'games' | 'winRate' | 'name'
 type ResultFilter = 'all' | 'wins' | 'losses'
@@ -210,10 +211,10 @@ export function PlayerDetailPage() {
   }
 
   const player = profile.data.profile
-  const wins = wl.data?.win ?? 0
-  const losses = wl.data?.lose ?? 0
-  const totalGames = wins + losses
-  const careerWinRate = totalGames ? wins / totalGames : null
+  const wins = wl.data?.win ?? null
+  const losses = wl.data?.lose ?? null
+  const totalGames = wins != null && losses != null ? wins + losses : null
+  const careerWinRate = totalGames ? (wins ?? 0) / totalGames : null
   const rank = rankLabel(profile.data.rank_tier)
   const lastLogin = player.last_login ? timeAgoFromIso(player.last_login) : 'Unknown'
 
@@ -277,15 +278,23 @@ export function PlayerDetailPage() {
       <div className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-top"><span className="kpi-label">Career games</span><History size={16} className="kpi-icon" /></div>
-          <div className="kpi-value">{formatNumber(totalGames)}</div>
-          <div className="kpi-foot"><span>{formatNumber(wins)} wins · {formatNumber(losses)} losses</span></div>
+          <div className="kpi-value">{totalGames != null ? formatNumber(totalGames) : '—'}</div>
+          <div className="kpi-foot">
+            <span>
+              {wins != null && losses != null
+                ? `${formatNumber(wins)} wins · ${formatNumber(losses)} losses`
+                : 'career record unavailable'}
+            </span>
+          </div>
         </div>
         <div className="kpi-card">
           <div className="kpi-top"><span className="kpi-label">Career win rate</span><Target size={16} className="kpi-icon" /></div>
           <div className={classNames('kpi-value', careerWinRate != null && careerWinRate >= 0.5 ? 'text-good' : 'text-bad')}>
             {careerWinRate != null ? formatPercent(careerWinRate) : '—'}
           </div>
-          <div className="kpi-foot"><span>across {formatNumber(totalGames)} recorded games</span></div>
+          <div className="kpi-foot">
+            <span>{totalGames != null ? `across ${formatNumber(totalGames)} recorded games` : 'career record unavailable'}</span>
+          </div>
         </div>
         <div className="kpi-card">
           <div className="kpi-top"><span className="kpi-label">Computed MMR</span><TrendingUp size={16} className="kpi-icon" /></div>
@@ -298,6 +307,8 @@ export function PlayerDetailPage() {
           <div className="kpi-foot"><span>{recentForm.rows.length} match sample · {recentForm.won} wins</span></div>
         </div>
       </div>
+
+      <PerformanceReview matches={recent.data ?? []} />
 
       <div className="detail-layout">
         <div className="detail-main">
@@ -565,17 +576,17 @@ export function PlayerDetailPage() {
             ) : (
               <>
                 <div className="wl-numbers">
-                  <div><strong className="text-good">{formatNumber(wins)}</strong><span>Wins</span></div>
-                  <div><strong className="text-bad">{formatNumber(losses)}</strong><span>Losses</span></div>
+                  <div><strong className="text-good">{formatNumber(wins ?? 0)}</strong><span>Wins</span></div>
+                  <div><strong className="text-bad">{formatNumber(losses ?? 0)}</strong><span>Losses</span></div>
                 </div>
                 <div className="wl-bar">
                   <span className="wl-bar-win" style={{ width: `${careerWinRate != null ? careerWinRate * 100 : 50}%` }} />
                 </div>
                 <div className="wl-caption">
                   <span>{careerWinRate != null ? formatPercent(careerWinRate) : '—'} win rate</span>
-                  <span>{formatNumber(totalGames)} games</span>
+                  <span>{totalGames != null ? formatNumber(totalGames) : '—'} games</span>
                 </div>
-                <WinRate value={careerWinRate} games={totalGames} size="sm" />
+                <WinRate value={careerWinRate} games={totalGames ?? undefined} size="sm" />
               </>
             )}
           </section>

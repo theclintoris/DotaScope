@@ -273,6 +273,28 @@ export interface RecentMatch {
   hero_variant: number | null
 }
 
+export interface BenchmarkPoint {
+  percentile: number
+  value: number
+}
+
+export type BenchmarkMetric =
+  | 'gold_per_min'
+  | 'xp_per_min'
+  | 'kills_per_min'
+  | 'deaths_per_min'
+  | 'assists_per_min'
+  | 'last_hits_per_min'
+  | 'denies_per_min'
+  | 'hero_damage_per_min'
+  | 'hero_healing_per_min'
+  | 'tower_damage'
+
+export interface HeroBenchmarks {
+  hero_id: number
+  result: Partial<Record<BenchmarkMetric, BenchmarkPoint[]>>
+}
+
 export interface MatchPlayer {
   account_id: number | null
   player_slot: number

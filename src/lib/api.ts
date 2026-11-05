@@ -1,5 +1,6 @@
 import type {
   ExplorerResponse,
+  HeroBenchmarks,
   HeroDuration,
   HeroMatchup,
   ItemConstants,
@@ -250,6 +251,12 @@ export function fetchHeroDurations(heroId: string) {
 export function fetchHeroItems(heroId: string) {
   return apiGet<Record<string, Record<string, number>>>(`/heroes/${heroId}/itemPopularity`, {
     ttl: TTL.detail,
+  })
+}
+
+export function fetchHeroBenchmarks(heroId: string) {
+  return apiGet<HeroBenchmarks>(`/benchmarks?hero_id=${heroId}`, {
+    ttl: TTL.constants,
   })
 }
 
