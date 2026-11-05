@@ -6,6 +6,7 @@ import {
   Crosshair,
   Database,
   Download,
+  KeyRound,
   LayoutDashboard,
   LogIn,
   Medal,
@@ -30,6 +31,7 @@ import { classNames, timeAgo } from '../lib/format'
 import { Brand } from './Brand'
 import { MetaLens } from './MetaLens'
 import { CommandPalette } from './CommandPalette'
+import { ApiKeyDialog } from './ApiKeyDialog'
 import { InstallDialog } from './InstallDialog'
 import { ProfileDialog } from './ProfileDialog'
 import { PlayerAvatar, RankBadge } from './ui'
@@ -93,6 +95,7 @@ export function AppShell() {
   const [moreOpen, setMoreOpen] = useState(false)
   const [installOpen, setInstallOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [apiKeyOpen, setApiKeyOpen] = useState(false)
   const [, setTick] = useState(0)
   const section = resolveSection(location.pathname)
   const moreActive = MORE_LINKS.some((link) => location.pathname.startsWith(link.to))
@@ -103,6 +106,12 @@ export function AppShell() {
   useEffect(() => {
     setMoreOpen(false)
   }, [location.pathname])
+
+  useEffect(() => {
+    const openApiKey = () => setApiKeyOpen(true)
+    window.addEventListener('dotascope:open-api-key', openApiKey)
+    return () => window.removeEventListener('dotascope:open-api-key', openApiKey)
+  }, [])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -251,6 +260,15 @@ export function AppShell() {
             </button>
             <button
               type="button"
+              className="icon-btn"
+              onClick={() => setApiKeyOpen(true)}
+              aria-label="OpenDota API key"
+              title="OpenDota API key"
+            >
+              <KeyRound size={16} />
+            </button>
+            <button
+              type="button"
               className="icon-btn mobile-filter-btn"
               onClick={() => setMoreOpen(true)}
               aria-label="Open filters and more"
@@ -339,6 +357,7 @@ export function AppShell() {
 
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} />
       <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
+      <ApiKeyDialog open={apiKeyOpen} onClose={() => setApiKeyOpen(false)} />
       <InstallDialog
         open={installOpen}
         onClose={() => setInstallOpen(false)}
@@ -436,6 +455,16 @@ export function AppShell() {
                   }}
                 >
                   <Database size={15} /> Open SQL data lab
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-quiet btn-wide"
+                  onClick={() => {
+                    setMoreOpen(false)
+                    setApiKeyOpen(true)
+                  }}
+                >
+                  <KeyRound size={15} /> OpenDota API key
                 </button>
               </div>
 

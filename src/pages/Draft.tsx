@@ -62,7 +62,7 @@ function filled<T>(value: T | null): value is T {
 
 export function DraftPage() {
   useDocumentTitle('Draft lab')
-  const { heroes, bracket, setBracket, loading, error, refresh } = useMeta()
+  const { heroes, metrics, population, bracket, setBracket, loading, error, refresh } = useMeta()
   const { accountId, profile } = useProfile()
   const myHeroes = useRemote<PlayerHero[]>(
     accountId ? `/players/${accountId}/heroes` : null,
@@ -93,8 +93,8 @@ export function DraftPage() {
   const bracketLabel = RANKS.find((rank) => rank.value === bracket)?.label ?? 'All ranks'
 
   const draftMetrics = useMemo(
-    () => buildHeroMetrics(heroes, 'ranked', bracket),
-    [heroes, bracket],
+    () => (population === 'immortal' ? metrics : buildHeroMetrics(heroes, 'ranked', bracket)),
+    [heroes, bracket, metrics, population],
   )
 
   useEffect(() => {
@@ -187,7 +187,9 @@ export function DraftPage() {
           : 0
         const metaEdge = (metric.metaScore - 50) / 50
         const baseEdge = metric.winRate - 0.5
-        const bracketLift = bracket > 0 ? Math.max(0, 0.485 - metric.winRate) * 220 : 0
+        const bracketLift = population !== 'immortal' && bracket > 0
+          ? Math.max(0, 0.485 - metric.winRate) * 220
+          : 0
         const mine = personalPool.get(metric.hero.id)
         const personalGames = mine?.games ?? 0
         const personalWinRate = personalGames ? (mine?.win ?? 0) / personalGames : null
@@ -212,7 +214,7 @@ export function DraftPage() {
       })
       .sort((a, b) => b.score - a.score || b.metric.metaScore - a.metric.metaScore)
       .slice(0, 12)
-  }, [allyPicks, enemyPicks, matchupData, draftMetrics, bracket, roleFilter, personalPool, personalFit])
+  }, [allyPicks, enemyPicks, matchupData, draftMetrics, bracket, population, roleFilter, personalPool, personalFit])
 
   const pickerHero = picker
     ? (picker.side === 'ally' ? allyPicks[picker.index] : enemyPicks[picker.index])
@@ -414,28 +416,39 @@ export function DraftPage() {
             </Link>
           )}
 
-          <div className="draft-bracket-row">
-            <label htmlFor="draft-bracket">MMR bracket</label>
-            <div className="select-wrap select-sm">
-              <select
-                id="draft-bracket"
-                value={bracket}
-                onChange={(event) => setBracket(Number(event.target.value))}
-              >
-                {RANKS.map((rank) => (
-                  <option key={rank.value} value={rank.value}>{rank.label}</option>
-                ))}
-              </select>
+          {population === 'immortal' ? (
+            <div className="draft-bracket-row">
+              <span className="muted-label">Immortal lens</span>
+              <span className="draft-bracket-note">
+                <ShieldCheck size={13} /> Spectral weekly sample
+              </span>
             </div>
-            <span className="draft-bracket-note" title="Counter matchups are global OpenDota data. The bracket lens reweights suggestions using that MMR band's win and pick rates.">
-              <ShieldCheck size={13} /> {bracket === 0 ? 'No bracket penalty' : `${bracketLabel} guardrail`}
-            </span>
-          </div>
+          ) : (
+            <div className="draft-bracket-row">
+              <label htmlFor="draft-bracket">MMR bracket</label>
+              <div className="select-wrap select-sm">
+                <select
+                  id="draft-bracket"
+                  value={bracket}
+                  onChange={(event) => setBracket(Number(event.target.value))}
+                >
+                  {RANKS.map((rank) => (
+                    <option key={rank.value} value={rank.value}>{rank.label}</option>
+                  ))}
+                </select>
+              </div>
+              <span className="draft-bracket-note" title="Counter matchups are global OpenDota data. The bracket lens reweights suggestions using that MMR band's win and pick rates.">
+                <ShieldCheck size={13} /> {bracket === 0 ? 'No bracket penalty' : `${bracketLabel} guardrail`}
+              </span>
+            </div>
+          )}
 
           <p className="draft-bracket-hint">
-            {bracket === 0
-              ? 'Counter matchups are global. Pick an MMR bracket to apply its win-rate guardrail to the shortlist.'
-              : `Counter matchups are global; the MMR lens reweights every suggestion with ${bracketLabel.toLowerCase()} win and pick rates so low-win-rate counters drop.`}
+            {population === 'immortal'
+              ? 'Immortal hero win and pick rates come from the Spectral weekly sample; counter edges still use the global parsed matchup sample.'
+              : bracket === 0
+                ? 'Counter matchups are global. Pick an MMR bracket to apply its win-rate guardrail to the shortlist.'
+                : `Counter matchups are global; the MMR lens reweights every suggestion with ${bracketLabel.toLowerCase()} win and pick rates so low-win-rate counters drop.`}
           </p>
 
           <div className="draft-role-row" role="group" aria-label="Filter suggestions by role">

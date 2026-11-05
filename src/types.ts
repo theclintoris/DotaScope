@@ -1,4 +1,4 @@
-export type Population = 'ranked' | 'pro' | 'turbo'
+export type Population = 'ranked' | 'pro' | 'turbo' | 'immortal'
 
 export type Attribute = 'str' | 'agi' | 'int' | 'all'
 
@@ -68,6 +68,33 @@ export interface HeroMatchup {
   hero_id: number
   games_played: number
   wins: number
+}
+
+export interface ImmortalHeroRow {
+  hero_id: number
+  matches: number
+  wins: number
+  pick_rate: number
+  win_rate: number
+  hero_tag: string
+}
+
+export interface ImmortalSnapshot {
+  total: number
+  version: string
+  starting_time: number
+  fetchedAt: number
+  response: Record<string, ImmortalHeroRow>
+}
+
+export interface ImmortalMatchupRow {
+  hero_id: number
+  matches: number
+  wins: number
+  winrate: number
+  expectation: number
+  same_lane_rate: number
+  wr_diff: number
 }
 
 export interface HeroDuration {
@@ -329,6 +356,16 @@ export interface MatchPlayer {
   lose: number
   total_gold: number | null
   kda: number | null
+  obs_placed?: number
+  sen_placed?: number
+  observers_placed?: number
+  observer_kills?: number
+  sentry_kills?: number
+  camps_stacked?: number
+  creeps_stacked?: number
+  rune_pickups?: number
+  stuns?: number
+  purchase_log?: { time: number; key: string }[]
 }
 
 export interface PickBan {
@@ -370,7 +407,13 @@ export interface MatchDetail {
   radiant_team_id: number | null
   dire_team_id: number | null
   patch: number | null
-  od_data?: { has_parsed: boolean; has_log: boolean }
+  od_data?: {
+    has_parsed: boolean
+    has_log?: boolean
+    has_api?: boolean
+    has_gcdata?: boolean
+    has_archive?: boolean
+  }
 }
 
 export interface RecordEntry {

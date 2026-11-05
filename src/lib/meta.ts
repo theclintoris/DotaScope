@@ -1,4 +1,4 @@
-import type { HeroMetric, HeroStat, Population } from '../types'
+import type { HeroMetric, HeroStat, ImmortalSnapshot, Population } from '../types'
 
 function numericField(hero: HeroStat, field: string): number {
   const value = hero[field]
@@ -96,6 +96,62 @@ export function buildHeroMetrics(
       proBans: hero.pro_ban ?? 0,
       pickTrend,
       trendDelta,
+      metaScore,
+    }
+  })
+}
+
+/**
+ * Builds the same shaped metrics as the public ranked sample, but from
+ * Spectral's Immortal-only report. Spectral's `pick_rate` is the share of
+ * matches containing a hero, so `matches` is used as the pick count here.
+ */
+export function buildImmortalMetrics(
+  heroes: HeroStat[],
+  snapshot: ImmortalSnapshot | null,
+): HeroMetric[] {
+  if (!snapshot) return []
+  const samples = heroes.map((hero) => {
+    const row = snapshot.response[String(hero.id)]
+    return {
+      hero,
+      picks: Math.max(0, Math.round(row?.matches ?? 0)),
+      wins: Math.max(0, Math.round(row?.wins ?? 0)),
+    }
+  })
+  const totalPicks = samples.reduce((sum, entry) => sum + entry.picks, 0)
+  const withGames = samples.filter((entry) => entry.picks > 0)
+  const rates = withGames.map((entry) => entry.wins / entry.picks)
+  const meanWinRate = rates.length ? rates.reduce((a, b) => a + b, 0) / rates.length : 0.5
+  const winVariance = rates.length
+    ? rates.reduce((sum, rate) => sum + (rate - meanWinRate) ** 2, 0) / rates.length
+    : 0.0001
+  const winStd = Math.max(Math.sqrt(winVariance), 0.007)
+  const meanPickRate = totalPicks ? 1 / Math.max(heroes.length, 1) : 0
+  const pickShares = withGames.map((entry) => (totalPicks ? entry.picks / totalPicks : 0))
+  const pickVariance = pickShares.length
+    ? pickShares.reduce((sum, rate) => sum + (rate - meanPickRate) ** 2, 0) /
+      pickShares.length
+    : 0.0001
+  const pickStd = Math.max(Math.sqrt(pickVariance), 0.0006)
+
+  return samples.map(({ hero, picks, wins }) => {
+    const winRate = picks > 0 ? wins / picks : 0
+    const pickRate = totalPicks > 0 ? picks / totalPicks : 0
+    const winZ = picks > 0 ? (winRate - meanWinRate) / winStd : 0
+    const pickZ = (pickRate - meanPickRate) / pickStd
+    const metaScore = Math.max(1, Math.min(99, Math.round(50 + winZ * 10 + pickZ * 3.5)))
+    return {
+      hero,
+      picks,
+      wins,
+      winRate,
+      pickRate,
+      proPicks: hero.pro_pick ?? 0,
+      proWins: hero.pro_win ?? 0,
+      proBans: hero.pro_ban ?? 0,
+      pickTrend: [],
+      trendDelta: null,
       metaScore,
     }
   })

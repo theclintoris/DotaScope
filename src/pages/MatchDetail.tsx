@@ -11,6 +11,9 @@ import {
   Coins,
   Crosshair,
   Database,
+  Eye,
+  KeyRound,
+  Layers3,
   Shield,
   Skull,
   Timer,
@@ -25,8 +28,9 @@ import type {
   PickBan,
 } from '../types'
 import { useMeta } from '../context/MetaContext'
-import { TTL } from '../lib/api'
+import { requestMatchParse, TTL } from '../lib/api'
 import { useDocumentTitle, useRemote } from '../lib/hooks'
+import { hasOpenDotaKey } from '../lib/settings'
 import {
   gameModeName,
   heroImage,
@@ -58,6 +62,8 @@ export function MatchDetailPage() {
   const detail = useRemote<MatchDetail>(matchId ? `/matches/${matchId}` : null, TTL.detail)
   const items = useRemote<ItemConstants>('/constants/items', TTL.constants)
   const [chartMode, setChartMode] = useState<'gold' | 'xp'>('gold')
+  const [parseState, setParseState] = useState<'idle' | 'requesting' | 'queued' | 'error'>('idle')
+  const [parseError, setParseError] = useState<string | null>(null)
   const match = detail.data
   useDocumentTitle(match ? `Match #${match.match_id}` : 'Match')
 
@@ -76,6 +82,25 @@ export function MatchDetailPage() {
       dire: sorted.filter((player) => !player.isRadiant),
     }
   }, [match])
+
+  const parsed = Boolean(match?.od_data?.has_parsed)
+
+  const requestParse = async () => {
+    if (!match) return
+    if (!hasOpenDotaKey()) {
+      window.dispatchEvent(new Event('dotascope:open-api-key'))
+      return
+    }
+    setParseState('requesting')
+    setParseError(null)
+    try {
+      await requestMatchParse(match.match_id)
+      setParseState('queued')
+    } catch (error) {
+      setParseState('error')
+      setParseError(error instanceof Error ? error.message : 'Could not request a replay parse.')
+    }
+  }
 
   if (detail.loading && !match) return <PageLoader label="Loading match dossier…" />
 
@@ -212,6 +237,50 @@ export function MatchDetailPage() {
         <p className="panel-footnote">Positive values favour Radiant; negative values favour Dire. Parsed match data from OpenDota.</p>
       </section>
 
+      {!parsed && (
+        <section className="panel parse-panel">
+          <SectionHeading
+            eyebrow="Replay intelligence"
+            title="This match is not parsed yet"
+            hint="Parsed matches unlock wards, stacks, runes and stuns"
+            action={<span className="muted-label"><Database size={13} /> Basic match data</span>}
+          />
+          <div className="parse-panel-body">
+            <div>
+              <p className="muted-copy">
+                OpenDota can parse the replay for deeper economy and utility data. Replay parsing
+                is a paid OpenDota feature, so it needs your own API key.
+              </p>
+              {parseError && <p className="inline-error">{parseError}</p>}
+              {parseState === 'queued' && (
+                <p className="inline-alert">
+                  Parse requested. OpenDota usually finishes within a minute — refresh this match shortly.
+                </p>
+              )}
+            </div>
+            <div className="parse-panel-actions">
+              {!hasOpenDotaKey() ? (
+                <button type="button" className="btn btn-primary" onClick={requestParse}>
+                  <KeyRound size={15} /> Add API key
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={requestParse}
+                  disabled={parseState === 'requesting' || parseState === 'queued'}
+                >
+                  <Database size={15} /> {parseState === 'requesting' ? 'Requesting…' : parseState === 'queued' ? 'Queued' : 'Request replay parse'}
+                </button>
+              )}
+              <button type="button" className="btn btn-ghost" onClick={() => detail.refresh()}>
+                Refresh match
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="panel scoreboard-panel">
         <SectionHeading
           eyebrow="Scoreboard"
@@ -242,6 +311,15 @@ export function MatchDetailPage() {
           />
         </div>
       </section>
+
+      {parsed && (
+        <VisionPanel
+          players={match.players}
+          heroes={heroes}
+          radiantName={radiantName}
+          direName={direName}
+        />
+      )}
 
       <div className="detail-layout">
         <div className="detail-main">
@@ -309,6 +387,107 @@ export function MatchDetailPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+const UTILITY_ITEMS = ['smoke_of_deceit', 'dust', 'gem'] as const
+
+function utilityCount(player: MatchPlayer, key: string) {
+  return (player.purchase_log ?? []).filter((entry) => entry.key === key).length
+}
+
+function VisionPanel({
+  players,
+  heroes,
+  radiantName,
+  direName,
+}: {
+  players: MatchPlayer[]
+  heroes: Map<number, HeroStat>
+  radiantName: string
+  direName: string
+}) {
+  const rows = [...players].sort((a, b) => a.player_slot - b.player_slot)
+  const totals = rows.reduce(
+    (sum, player) => ({
+      obs: sum.obs + (player.obs_placed ?? player.observers_placed ?? 0),
+      sentries: sum.sentries + (player.sen_placed ?? 0),
+      dewards: sum.dewards + (player.observer_kills ?? 0) + (player.sentry_kills ?? 0),
+      camps: sum.camps + (player.camps_stacked ?? 0),
+      runes: sum.runes + (player.rune_pickups ?? 0),
+    }),
+    { obs: 0, sentries: 0, dewards: 0, camps: 0, runes: 0 },
+  )
+
+  return (
+    <section className="panel vision-panel">
+      <SectionHeading
+        eyebrow="Vision & utility"
+        title="Beyond the scoreboard"
+        hint={`${rows.length} parsed players`}
+        action={<span className="muted-label"><Eye size={13} /> Parsed replay data</span>}
+      />
+      <div className="vision-summary">
+        <div><Eye size={15} /><strong>{totals.obs}</strong><span>Observer wards</span></div>
+        <div><Eye size={15} /><strong>{totals.sentries}</strong><span>Sentry wards</span></div>
+        <div><Crosshair size={15} /><strong>{totals.dewards}</strong><span>Wards destroyed</span></div>
+        <div><Layers3 size={15} /><strong>{totals.camps}</strong><span>Camps stacked</span></div>
+        <div><Trophy size={15} /><strong>{totals.runes}</strong><span>Runes picked</span></div>
+      </div>
+      <div className="table-wrap vision-table-wrap">
+        <table className="data-table vision-table">
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th className="num">Obs</th>
+              <th className="num">Sen</th>
+              <th className="num">Dewards</th>
+              <th className="num">Camps</th>
+              <th className="num">Runes</th>
+              <th className="num">Stuns</th>
+              <th>Utility</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((player) => {
+              const hero = heroes.get(player.hero_id)
+              const side = player.isRadiant ? 'Radiant' : 'Dire'
+              return (
+                <tr key={player.player_slot} className={player.isRadiant ? 'row-radiant' : 'row-dire'}>
+                  <td>
+                    <div className="vision-player">
+                      <HeroPortrait hero={hero} size="xs" />
+                      <span>
+                        <strong>{player.personaname || player.name || 'Anonymous'}</strong>
+                        <small>{hero?.localized_name ?? `Hero ${player.hero_id}`} · {side}</small>
+                      </span>
+                    </div>
+                  </td>
+                  <td className="num">{player.obs_placed ?? player.observers_placed ?? 0}</td>
+                  <td className="num">{player.sen_placed ?? 0}</td>
+                  <td className="num">{(player.observer_kills ?? 0) + (player.sentry_kills ?? 0)}</td>
+                  <td className="num">{player.camps_stacked ?? 0}</td>
+                  <td className="num">{player.rune_pickups ?? 0}</td>
+                  <td className="num">{Math.round(player.stuns ?? 0)}s</td>
+                  <td>
+                    <span className="muted-copy vision-utility">
+                      {UTILITY_ITEMS.map((key) => {
+                        const count = utilityCount(player, key)
+                        return count > 0 ? `${key.replace(/_/g, ' ')} ${count}` : null
+                      }).filter(Boolean).join(' · ') || '—'}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="panel-footnote">
+        Parsed replay data from OpenDota. Utility counts come from the purchase log; “wards destroyed”
+        includes observer and sentry kills where available. {radiantName} and {direName} are the team labels.
+      </p>
+    </section>
   )
 }
 

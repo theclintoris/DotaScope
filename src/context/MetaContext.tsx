@@ -1,7 +1,21 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
-import type { HeroMetric, HeroStat, PatchInfo, Population } from '../types'
-import { buildHeroMetrics } from '../lib/meta'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
+import type {
+  HeroMetric,
+  HeroStat,
+  ImmortalSnapshot,
+  PatchInfo,
+  Population,
+} from '../types'
+import { buildHeroMetrics, buildImmortalMetrics } from '../lib/meta'
 import { usePersistentState, useRemote } from '../lib/hooks'
+import { fetchImmortalSnapshot } from '../lib/spectral'
 import { TTL } from '../lib/api'
 
 interface MetaContextValue {
@@ -16,6 +30,7 @@ interface MetaContextValue {
   population: Population
   setPopulation: (value: Population) => void
   latestPatch: PatchInfo | null
+  immortal: ImmortalSnapshot | null
 }
 
 const MetaContext = createContext<MetaContextValue | null>(null)
@@ -28,11 +43,42 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   )
   const heroQuery = useRemote<HeroStat[]>('/heroStats', TTL.meta)
   const patches = useRemote<PatchInfo[]>('/constants/patch', TTL.constants)
+  const [immortal, setImmortal] = useState<ImmortalSnapshot | null>(null)
+  const [immortalLoading, setImmortalLoading] = useState(false)
+  const [immortalError, setImmortalError] = useState<Error | null>(null)
+  const [immortalNonce, setImmortalNonce] = useState(0)
+
+  useEffect(() => {
+    if (population !== 'immortal') return
+    let cancelled = false
+    setImmortalLoading(true)
+    setImmortalError(null)
+    fetchImmortalSnapshot(immortalNonce > 0)
+      .then((snapshot) => {
+        if (cancelled) return
+        setImmortal(snapshot)
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return
+        setImmortalError(
+          error instanceof Error ? error : new Error('Immortal sample unavailable.'),
+        )
+      })
+      .finally(() => {
+        if (!cancelled) setImmortalLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [population, immortalNonce])
 
   const heroes = useMemo(() => heroQuery.data ?? [], [heroQuery.data])
   const metrics = useMemo(
-    () => buildHeroMetrics(heroes, population, bracket),
-    [heroes, population, bracket],
+    () =>
+      population === 'immortal'
+        ? buildImmortalMetrics(heroes, immortal)
+        : buildHeroMetrics(heroes, population, bracket),
+    [heroes, population, bracket, immortal],
   )
   const latestPatch = useMemo(() => {
     if (!patches.data?.length) return null
@@ -42,15 +88,22 @@ export function MetaProvider({ children }: { children: ReactNode }) {
   const value: MetaContextValue = {
     heroes,
     metrics,
-    loading: heroQuery.loading,
-    error: heroQuery.error,
-    refresh: heroQuery.refresh,
-    lastUpdated: heroQuery.lastUpdated,
+    loading:
+      heroQuery.loading ||
+      (population === 'immortal' && (immortalLoading || (!immortal && !immortalError))),
+    error: population === 'immortal' ? immortalError ?? heroQuery.error : heroQuery.error,
+    refresh: () => {
+      heroQuery.refresh()
+      if (population === 'immortal') setImmortalNonce((value) => value + 1)
+    },
+    lastUpdated:
+      population === 'immortal' ? immortal?.fetchedAt ?? null : heroQuery.lastUpdated,
     bracket,
     setBracket,
     population,
     setPopulation,
     latestPatch,
+    immortal,
   }
 
   return <MetaContext.Provider value={value}>{children}</MetaContext.Provider>

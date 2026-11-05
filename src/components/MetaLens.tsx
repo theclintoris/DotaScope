@@ -1,8 +1,9 @@
-import { ChevronDown, Database, Info, RotateCcw } from 'lucide-react'
+import { ArrowUpRight, ChevronDown, Database, Info, RotateCcw } from 'lucide-react'
 import { useMeta } from '../context/MetaContext'
 import { POPULATIONS, RANKS, rankMedal } from '../lib/constants'
 import { formatCompact, classNames } from '../lib/format'
 import { totalGames } from '../lib/meta'
+import { IMMORTAL_ATTRIBUTION } from '../lib/spectral'
 
 export function MetaLens({ compact = false }: { compact?: boolean }) {
   const {
@@ -13,8 +14,10 @@ export function MetaLens({ compact = false }: { compact?: boolean }) {
     latestPatch,
     metrics,
     loading,
+    error,
   } = useMeta()
   const ranked = population === 'ranked'
+  const immortal = population === 'immortal'
   const games = totalGames(metrics)
   return (
     <section className={classNames('meta-lens', compact && 'meta-lens-compact')} aria-label="Meta lens filters">
@@ -23,7 +26,7 @@ export function MetaLens({ compact = false }: { compact?: boolean }) {
           <span className="eyebrow">Meta lens</span>
           {!compact && <p>Shape every stat on the site.</p>}
         </div>
-        <span className="tip" data-tip="OpenDota's heroStats endpoint only exposes samples by rank bracket and mode. Pro and Turbo data are separate populations.">
+        <span className="tip" data-tip="OpenDota's heroStats endpoint only exposes rank brackets 1–7. Immortal is a separate seven-day sample from Spectral.">
           <Info size={14} />
         </span>
       </div>
@@ -48,7 +51,11 @@ export function MetaLens({ compact = false }: { compact?: boolean }) {
       <div className="lens-field">
         <label className="lens-label" htmlFor="rank-bracket">
           Rank bracket
-          {!ranked && <span className="lens-label-note">ranked pubs only</span>}
+          {!ranked && (
+            <span className="lens-label-note">
+              {immortal ? 'not split by medal' : 'ranked pubs only'}
+            </span>
+          )}
         </label>
         <div className={classNames('select-wrap', !ranked && 'is-disabled')}>
           <select
@@ -74,12 +81,28 @@ export function MetaLens({ compact = false }: { compact?: boolean }) {
         </div>
       </div>
 
-      <div className="lens-sample">
+      <div className={classNames('lens-sample', error && 'is-error')}>
         <Database size={13} />
         <span>
-          {loading ? 'Sampling…' : `${formatCompact(games)} games · ${metrics.length} heroes`}
+          {immortal && error
+            ? 'Immortal sample unavailable'
+            : loading
+              ? 'Sampling…'
+              : `${formatCompact(games)} games · ${metrics.length} heroes`}
         </span>
       </div>
+
+      {immortal && (
+        <a
+          className="lens-source"
+          href={IMMORTAL_ATTRIBUTION}
+          target="_blank"
+          rel="noreferrer"
+          title="Immortal data source"
+        >
+          Immortal sample by Spectral <ArrowUpRight size={10} />
+        </a>
+      )}
 
       {latestPatch && (
         <div className="lens-patch">

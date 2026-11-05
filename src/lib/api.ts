@@ -1,3 +1,4 @@
+import { getOpenDotaKey } from './settings'
 import type {
   ExplorerResponse,
   HeroBenchmarks,
@@ -52,7 +53,10 @@ export class ApiError extends Error {
 }
 
 function fullUrl(path: string): string {
-  return `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`
+  const url = new URL(`${API_BASE}${path.startsWith('/') ? path : `/${path}`}`)
+  const apiKey = getOpenDotaKey()
+  if (apiKey) url.searchParams.set('api_key', apiKey)
+  return url.toString()
 }
 
 function readPersistent<T>(key: string): CacheEntry<T> | null {
@@ -270,7 +274,7 @@ export async function runExplorer(sql: string): Promise<ExplorerResponse> {
   }
   const trimmed = sql.trim().replace(/;+$/, '')
   const bounded = /\blimit\b/i.test(trimmed) ? trimmed : `${trimmed}\nLIMIT 100`
-  const response = await fetch(`${API_BASE}/explorer?sql=${encodeURIComponent(bounded)}`, {
+  const response = await fetch(fullUrl(`/explorer?sql=${encodeURIComponent(bounded)}`), {
     headers: { Accept: 'application/json' },
   })
   const payload = (await response.json().catch(() => ({}))) as ExplorerResponse
@@ -293,4 +297,34 @@ export async function fetchTableSchema(table: string) {
     name: String(row.column_name ?? ''),
     type: String(row.data_type ?? ''),
   }))
+}
+
+export async function requestMatchParse(matchId: string | number): Promise<void> {
+  const apiKey = getOpenDotaKey()
+  if (!apiKey) {
+    throw new ApiError('Add an OpenDota API key before requesting a replay parse.', 400)
+  }
+  const id = String(matchId)
+  if (!/^\d+$/.test(id)) throw new ApiError('Invalid match ID.', 400)
+  const url = new URL(`${API_BASE}/request/${id}`)
+  url.searchParams.set('api_key', apiKey)
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+  })
+  if (!response.ok) {
+    let detail = ''
+    try {
+      detail = (await response.text()).slice(0, 300)
+    } catch {
+      detail = ''
+    }
+    throw new ApiError(
+      response.status === 401 || response.status === 403
+        ? 'OpenDota rejected that API key.'
+        : `OpenDota could not queue this parse (${response.status}).`,
+      response.status,
+      detail,
+    )
+  }
 }

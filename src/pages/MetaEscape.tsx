@@ -1,22 +1,81 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUpRight, FlaskConical, Gem, Info, Sparkles, Swords } from 'lucide-react'
+import { ArrowUpRight, FlaskConical, Gem, Info, Sparkles, Swords, Wrench } from 'lucide-react'
 import { useMeta } from '../context/MetaContext'
 import { useDocumentTitle, useRemote } from '../lib/hooks'
 import { fetchHeroItems, fetchHeroMatchups, runExplorer } from '../lib/api'
 import { TTL } from '../lib/api'
+import { fetchImmortalMatchups } from '../lib/spectral'
 import { formatNumber, formatPercent } from '../lib/format'
 import { heroImage, itemImage } from '../lib/constants'
 import type {
   DotaItem,
-  HeroMatchup,
   HeroMetric,
   ItemConstants,
 } from '../types'
-import { EmptyState, HeroPortrait, PageHeader, SectionHeading, Skeleton } from '../components/ui'
+import {
+  EmptyState,
+  HeroPortrait,
+  MetaGradeBadge,
+  PageHeader,
+  SectionHeading,
+  Skeleton,
+} from '../components/ui'
 
 const ITEM_CACHE_KEY = 'dotascope.metaEscape.items.v1'
 const ITEM_CACHE_TTL = 6 * 60 * 60 * 1000
+function metaBuildQuery(heroIds: number[]): string {
+  const ids = heroIds
+    .filter((id) => Number.isInteger(id) && id > 0)
+    .slice(0, 5)
+    .join(',')
+  return `
+WITH recent AS (
+  SELECT match_id, radiant_win
+  FROM matches
+  WHERE start_time > extract(epoch from now()) - 90 * 86400
+),
+hero_games AS (
+  SELECT pm.hero_id, count(*)::int AS games
+  FROM player_matches pm
+  JOIN recent m USING (match_id)
+  WHERE pm.hero_id IN (${ids})
+  GROUP BY pm.hero_id
+),
+buys AS (
+  SELECT pm.hero_id, v.item_id,
+    count(*)::int AS purchases,
+    sum(CASE WHEN (pm.player_slot < 128) = m.radiant_win THEN 1 ELSE 0 END)::int AS wins
+  FROM player_matches pm
+  JOIN recent m USING (match_id)
+  CROSS JOIN LATERAL (
+    VALUES (pm.item_0), (pm.item_1), (pm.item_2),
+      (pm.item_3), (pm.item_4), (pm.item_5), (pm.item_neutral)
+  ) AS v(item_id)
+  WHERE pm.hero_id IN (${ids}) AND v.item_id IS NOT NULL AND v.item_id <> 0
+  GROUP BY pm.hero_id, v.item_id
+)
+SELECT b.hero_id, b.item_id, i.name, i.cost, hg.games, b.purchases,
+  round(100.0 * b.purchases / NULLIF(hg.games, 0), 2) AS buy_rate,
+  round(100.0 * b.wins / NULLIF(b.purchases, 0), 2) AS win_rate
+FROM buys b
+JOIN items i ON i.id = b.item_id
+JOIN hero_games hg USING (hero_id)
+WHERE i.cost >= 2500 AND b.purchases >= 20
+ORDER BY b.hero_id, win_rate DESC, b.purchases DESC
+LIMIT 100
+`
+}
+
+function parseBuildRows(rows: Record<string, unknown>[]): MetaBuildRow[] {
+  return rows.map((row) => ({
+    ...parseItemRow(row),
+    hero_id: numberValue(row.hero_id),
+    games: numberValue(row.games),
+    buy_rate: numberValue(row.buy_rate),
+  }))
+}
+
 const ITEM_QUERY = `
 WITH recent AS (
   SELECT match_id, radiant_win
@@ -61,11 +120,41 @@ interface ItemRow {
   win_rate: number
 }
 
+interface MetaBuildRow extends ItemRow {
+  hero_id: number
+  games: number
+  buy_rate: number
+}
+
+interface MetaBuildItem extends MetaBuildRow {
+  item: DotaItem | null
+  lift: number
+}
+
+interface MetaPunisher {
+  metric: HeroMetric
+  games: number
+  winRate: number
+  edge: number
+}
+
+interface MetaBuild {
+  metric: HeroMetric
+  items: MetaBuildItem[]
+  punishers: MetaPunisher[]
+}
+
 interface CounterTarget {
   metric: HeroMetric
   games: number
   winRate: number
   edge: number
+}
+
+interface EscapeMatchup {
+  hero_id: number
+  games: number
+  winRate: number
 }
 
 interface EscapeHero {
@@ -86,15 +175,19 @@ function numberValue(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-function parseItemRows(rows: Record<string, unknown>[]): ItemRow[] {
-  return rows.map((row) => ({
+function parseItemRow(row: Record<string, unknown>): ItemRow {
+  return {
     item_id: numberValue(row.item_id),
     name: String(row.name ?? ''),
     cost: numberValue(row.cost),
     purchases: numberValue(row.purchases),
     pick_rate: numberValue(row.pick_rate),
     win_rate: numberValue(row.win_rate),
-  }))
+  }
+}
+
+function parseItemRows(rows: Record<string, unknown>[]): ItemRow[] {
+  return rows.map(parseItemRow)
 }
 
 function readItemCache(): { at: number; rows: ItemRow[] } | null {
@@ -114,15 +207,14 @@ function cleanItemName(name: string): string {
   return name.replace(/^item_/, '').replace(/_/g, ' ')
 }
 
-function getCounters(matchups: HeroMatchup[] | undefined, topMeta: HeroMetric[]): CounterTarget[] {
+function getCounters(matchups: EscapeMatchup[] | undefined, topMeta: HeroMetric[]): CounterTarget[] {
   if (!matchups?.length) return []
   return topMeta
     .flatMap((metric) => {
       const row = matchups.find((matchup) => matchup.hero_id === metric.hero.id)
-      if (!row || row.games_played < 20) return []
-      const winRate = row.wins / row.games_played
-      if (winRate <= 0.505) return []
-      return [{ metric, games: row.games_played, winRate, edge: winRate - 0.5 }]
+      if (!row || row.games < 20) return []
+      if (row.winRate <= 0.505) return []
+      return [{ metric, games: row.games, winRate: row.winRate, edge: row.winRate - 0.5 }]
     })
     .sort((a, b) => b.edge - a.edge)
 }
@@ -142,14 +234,19 @@ export function MetaEscapePage() {
   const [itemLoading, setItemLoading] = useState(true)
   const [itemError, setItemError] = useState<string | null>(null)
   const [itemNonce, setItemNonce] = useState(0)
-  const [matchupMap, setMatchupMap] = useState<Record<number, HeroMatchup[]>>({})
+  const [matchupMap, setMatchupMap] = useState<Record<number, EscapeMatchup[]>>({})
   const [matchupLoading, setMatchupLoading] = useState(false)
   const [popularity, setPopularity] = useState<
     Record<number, Record<string, Record<string, number>>>
   >({})
   const [popularityLoading, setPopularityLoading] = useState(false)
+  const [buildRows, setBuildRows] = useState<MetaBuildRow[]>([])
+  const [buildLoading, setBuildLoading] = useState(true)
+  const [buildError, setBuildError] = useState<string | null>(null)
+  const [punisherMap, setPunisherMap] = useState<Record<number, EscapeMatchup[]>>({})
 
   const topMeta = useMemo(() => topMetaHeroes(meta.metrics), [meta.metrics])
+  const topMetaKey = topMeta.map((metric) => metric.hero.id).join(',')
 
   const escapeCandidates = useMemo(() => {
     const active = meta.metrics.filter((metric) => metric.picks >= 50)
@@ -201,6 +298,74 @@ export function MetaEscapePage() {
   }, [itemNonce])
 
   useEffect(() => {
+    if (!topMetaKey) return
+    let cancelled = false
+    setBuildLoading(true)
+    setBuildError(null)
+    runExplorer(metaBuildQuery(topMetaKey.split(',').map(Number)))
+      .then((response) => {
+        if (cancelled) return
+        setBuildRows(parseBuildRows(response.rows))
+        setBuildLoading(false)
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return
+        setBuildRows([])
+        setBuildLoading(false)
+        setBuildError(
+          error instanceof Error ? error.message : 'The off-meta build sample could not be loaded.',
+        )
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [topMetaKey])
+
+  useEffect(() => {
+    if (!topMetaKey) return
+    let cancelled = false
+    const ids = topMetaKey.split(',').map(Number)
+    setPunisherMap({})
+    Promise.allSettled(
+      ids.map(async (heroId) => {
+        if (meta.population === 'immortal') {
+          const rows = await fetchImmortalMatchups(heroId)
+          return [
+            heroId,
+            rows.map((row) => ({
+              hero_id: row.hero_id,
+              games: row.matches,
+              winRate: row.winrate / 100,
+            })),
+          ] as const
+        }
+        const rows = await fetchHeroMatchups(String(heroId))
+        return [
+          heroId,
+          rows.map((row) => ({
+            hero_id: row.hero_id,
+            games: row.games_played,
+            winRate: row.games_played > 0 ? row.wins / row.games_played : 0,
+          })),
+        ] as const
+      }),
+    ).then((results) => {
+      if (cancelled) return
+      const next: Record<number, EscapeMatchup[]> = {}
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          const [heroId, rows] = result.value
+          next[heroId] = rows
+        }
+      }
+      setPunisherMap(next)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [topMetaKey, meta.population])
+
+  useEffect(() => {
     if (!candidateKey) return
     let cancelled = false
     const ids = candidateKey.split(',').map(Number)
@@ -208,12 +373,30 @@ export function MetaEscapePage() {
     setMatchupLoading(true)
     Promise.allSettled(
       ids.map(async (heroId) => {
+        if (meta.population === 'immortal') {
+          const rows = await fetchImmortalMatchups(heroId)
+          return [
+            heroId,
+            rows.map((row) => ({
+              hero_id: row.hero_id,
+              games: row.matches,
+              winRate: row.winrate / 100,
+            })),
+          ] as const
+        }
         const rows = await fetchHeroMatchups(String(heroId))
-        return [heroId, rows] as const
+        return [
+          heroId,
+          rows.map((row) => ({
+            hero_id: row.hero_id,
+            games: row.games_played,
+            winRate: row.games_played > 0 ? row.wins / row.games_played : 0,
+          })),
+        ] as const
       }),
     ).then((results) => {
       if (cancelled) return
-      const next: Record<number, HeroMatchup[]> = {}
+      const next: Record<number, EscapeMatchup[]> = {}
       for (const result of results) {
         if (result.status === 'fulfilled') {
           const [heroId, rows] = result.value
@@ -226,7 +409,7 @@ export function MetaEscapePage() {
     return () => {
       cancelled = true
     }
-  }, [candidateKey])
+  }, [candidateKey, meta.population])
 
   const escapeHeroes = useMemo<EscapeHero[]>(() => {
     return escapeCandidates
@@ -308,6 +491,52 @@ export function MetaEscapePage() {
       .slice(0, 6)
   }, [escapeHeroes, itemRows, items.data, popularity])
 
+  const metaBuilds = useMemo<MetaBuild[]>(() => {
+    if (!buildRows.length) return []
+    return topMeta
+      .map((metric) => {
+        const baseline = metric.winRate * 100
+        const buildItems = buildRows
+          .filter(
+            (row) =>
+              row.hero_id === metric.hero.id &&
+              row.games >= 30 &&
+              row.purchases >= 15 &&
+              row.buy_rate <= 45,
+          )
+          .map((row) => {
+            const itemKey = row.name.replace(/^item_/, '')
+            return {
+              ...row,
+              item: items.data?.[row.name] ?? items.data?.[itemKey] ?? null,
+              lift: row.win_rate - baseline,
+            }
+          })
+          .filter((row) => row.win_rate >= 54 && row.lift >= 1.2)
+          .sort((a, b) => b.lift - a.lift)
+          .slice(0, 2)
+        const punishers = (punisherMap[metric.hero.id] ?? [])
+          .filter((row) => row.games >= 20 && row.winRate < 0.49)
+          .map((row) => {
+            const enemy = meta.metrics.find((candidate) => candidate.hero.id === row.hero_id)
+            return enemy
+              ? {
+                  metric: enemy,
+                  games: row.games,
+                  winRate: row.winRate,
+                  edge: 0.5 - row.winRate,
+                }
+              : null
+          })
+          .filter((row): row is MetaPunisher => Boolean(row))
+          .sort((a, b) => b.edge - a.edge)
+          .slice(0, 2)
+        return { metric, items: buildItems, punishers }
+      })
+      .filter((build) => build.items.length > 0)
+      .slice(0, 5)
+  }, [buildRows, items.data, meta.metrics, punisherMap, topMeta])
+
   if (meta.loading && !meta.heroes.length) {
     return (
       <div className="page-stack meta-escape-page">
@@ -345,7 +574,15 @@ export function MetaEscapePage() {
             <h2>What everyone is picking</h2>
             <p>The top five heroes by blended meta score. Escape cards below look for underplayed answers to this group.</p>
           </div>
-          <span className="badge badge-muted">{meta.population === 'ranked' ? 'Ranked pubs' : meta.population === 'pro' ? 'Pro scene' : 'Turbo'}</span>
+          <span className="badge badge-muted">
+            {meta.population === 'ranked'
+              ? 'Ranked pubs'
+              : meta.population === 'pro'
+                ? 'Pro scene'
+                : meta.population === 'turbo'
+                  ? 'Turbo'
+                  : 'Immortal · Spectral'}
+          </span>
         </div>
         <div className="escape-top-meta">
           {topMeta.map((metric, index) => (
@@ -521,8 +758,118 @@ export function MetaEscapePage() {
         )}
       </section>
 
+      <section className="escape-section">
+        <SectionHeading
+          eyebrow="Off-meta builds"
+          title="Break the script"
+          hint={
+            buildLoading
+              ? 'Aggregating 90-day parsed final inventories…'
+              : 'Low ownership · above hero baseline · parsed items only'
+          }
+          action={
+            <span className="escape-count">
+              <Wrench size={12} /> {metaBuilds.length || '—'} builds
+            </span>
+          }
+        />
+        {buildError ? (
+          <div className="panel escape-empty">
+            <EmptyState title="The off-meta build sample could not be loaded" icon={<Info size={22} />}>
+              {buildError}
+            </EmptyState>
+          </div>
+        ) : buildLoading ? (
+          <div className="escape-build-grid">
+            {Array.from({ length: 3 }, (_, index) => (
+              <Skeleton key={index} height={236} />
+            ))}
+          </div>
+        ) : metaBuilds.length ? (
+          <div className="escape-build-grid">
+            {metaBuilds.map((build) => (
+              <article className="panel escape-build-card" key={build.metric.hero.id}>
+                <div className="escape-build-head">
+                  <HeroPortrait hero={build.metric.hero} size="sm" />
+                  <div>
+                    <span className="eyebrow">Meta hero, unusual finish</span>
+                    <Link to={`/heroes/${build.metric.hero.id}`}>
+                      {build.metric.hero.localized_name}
+                    </Link>
+                    <small>
+                      {formatPercent(build.metric.winRate, 1)} hero WR · {build.metric.picks} picks
+                    </small>
+                  </div>
+                  <MetaGradeBadge score={build.metric.metaScore} size="sm" />
+                </div>
+
+                <div className="escape-build-items">
+                  {build.items.map((row) => (
+                    <div className="escape-build-item" key={row.item_id}>
+                      <span className="escape-build-item-art">
+                        {row.item ? (
+                          <img src={itemImage(row.item.img)} alt="" loading="lazy" />
+                        ) : (
+                          <Wrench size={18} />
+                        )}
+                      </span>
+                      <div>
+                        <strong>{row.item?.dname ?? cleanItemName(row.name)}</strong>
+                        <small>
+                          {formatPercent(row.buy_rate / 100, 1)} buy rate ·{' '}
+                          {formatPercent(row.win_rate / 100, 1)} WR · {row.purchases} games
+                        </small>
+                      </div>
+                      <em>+{formatPercent(row.lift / 100, 1)}</em>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="escape-build-counters">
+                  <span className="muted-label">Punished by</span>
+                  {build.punishers.length ? (
+                    build.punishers.map((counter) => (
+                      <Link
+                        className="escape-build-punisher"
+                        to={`/heroes/${counter.metric.hero.id}`}
+                        key={counter.metric.hero.id}
+                      >
+                        <HeroPortrait hero={counter.metric.hero} size="xs" />
+                        <span>{counter.metric.hero.localized_name}</span>
+                        <small>{build.metric.hero.localized_name} wins {formatPercent(counter.winRate, 1)}</small>
+                        <em>+{formatPercent(counter.edge, 1)}</em>
+                      </Link>
+                    ))
+                  ) : (
+                    <span className="escape-build-none">No reliable counter sample yet.</span>
+                  )}
+                </div>
+
+                <p className="escape-build-note">
+                  OpenDota final-inventory sample, 90 days, all parsed ranks. “Punished by” uses
+                  the current matchup lens, not the item.
+                </p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="panel escape-empty">
+            <EmptyState title="No off-meta build cleared the sample bar" icon={<Wrench size={22} />}>
+              The parsed final-inventory sample is thin for this meta group. Raise the sample
+              window later or inspect another lens.
+            </EmptyState>
+          </div>
+        )}
+      </section>
+
       <p className="escape-footnote">
-        <Info size={13} /> Counter edges are computed from OpenDota's global parsed pub matchups; the MMR lens changes which heroes look strong, not the historical head-to-head sample. Item win rates are descriptive snapshots, and carrier edges are not item-specific causal effects. Small samples are noisy.
+        <Info size={13} /> Counter edges are computed from{' '}
+        {meta.population === 'immortal'
+          ? "Spectral's seven-day Immortal matchup sample"
+          : "OpenDota's global parsed pub matchups"}
+        ; the lens changes which heroes look strong, not the historical head-to-head sample.
+        Item and build win rates are descriptive OpenDota snapshots (30-day underbought items,
+        90-day build cards); carrier edges are not item-specific causal effects. Small samples are noisy.
       </p>
     </div>
   )

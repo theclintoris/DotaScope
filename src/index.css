@@ -2,6 +2,8 @@
 @import './draft.css';
 @import './review.css';
 @import './metaescape.css';
+@import './settings.css';
+@import './vision.css';
 
 /* ============================================================
    DotaScope design system
@@ -2300,6 +2302,28 @@ pre {
   font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 500;
+}
+
+.lens-sample.is-error span {
+  color: var(--bad);
+}
+
+.lens-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  color: var(--accent);
+  font-size: 8px;
+  letter-spacing: 0.03em;
+  opacity: 0.82;
+  transition: opacity 150ms ease;
+}
+
+.lens-source:hover {
+  opacity: 1;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .lens-patch {

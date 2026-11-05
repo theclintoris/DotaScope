@@ -3,6 +3,37 @@
 All notable changes to DotaScope are recorded here. The public release lives at
 [github.com/theclintoris/DotaScope/releases](https://github.com/theclintoris/DotaScope/releases).
 
+## [Unreleased]
+
+### Added
+
+- **Immortal lens** — a fourth population driven by Spectral's weekly
+  `imm_ranked_meta_last_7` report. Immortal hero pick/win rates and
+  hero-vs-hero matchup edges are available across the global lens, Draft lab
+  and Meta escape, with source attribution and no medal-bracket split.
+- **Off-meta builds** — a nested Meta escape board for unusual but winning
+  final-item choices on the current meta heroes, plus the heroes with the
+  strongest matchup edges against those meta picks. Based on a 90-day parsed
+  final-inventory sample.
+- **OpenDota API key** — optional device-local key for higher rate limits and
+  replay-parse requests. Keys are stored in `localStorage`, sent only to
+  OpenDota, never logged, and can be removed from the key dialog.
+- **Vision & Utility** — parsed matches expose observer/sentry wards, dewards,
+  camps stacked, runes, stuns, smoke and gem purchases per player. Unparsed
+  matches offer a replay-parse request when a key is configured.
+- **Ranked-only performance review** — benchmark percentiles and review flags
+  now use only ranked standard games; Turbo and unranked matches are excluded.
+- **Hero and match-history grades** — S–D current-meta grades plus a +/−
+  expectation flag comparing the player's hero win rate with their rank
+  bracket's baseline.
+
+### Changed
+
+- Meta escape's item cards now attribute matchup edges to the carrier hero;
+  the off-meta build card label names the meta hero in its matchup line.
+- README documents Immortal, replay parsing, API key security, and the
+  Source/attribution for Spectral.
+
 ## [1.0.0] — 2026-11-05
 
 The first public release of DotaScope: a Dota 2 statistics cockpit for Windows,

@@ -48,6 +48,7 @@ export const POPULATIONS: {
   { value: 'ranked', label: 'Ranked pubs', short: 'Pubs', description: 'Public ranked sample' },
   { value: 'pro', label: 'Pro scene', short: 'Pro', description: 'Professional matches' },
   { value: 'turbo', label: 'Turbo', short: 'Turbo', description: 'Turbo match sample' },
+  { value: 'immortal', label: 'Immortal rank', short: 'Imm', description: 'Top-ladder Spectral sample' },
 ]
 
 export const HERO_ROLES = [
