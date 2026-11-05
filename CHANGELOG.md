@@ -27,10 +27,12 @@ All notable changes to DotaScope are recorded here. The public release lives at
   includes a `wards` payload with the existing timeline.
 - **Ranked performance review** — OpenDota hero-benchmark percentiles and review
   flags use only ranked standard games.
+- **Turbo Elo ladder** — a local, baseline-1,000 Elo ledger tracks every player found in parsed Turbo matches. Team-average expected scores use K=32; the player dossier shows current/peak rating, last change, match history, rank and the top of the tracked lobby leaderboard. Explicitly a DotaScope ladder, not Valve MMR.
 - **Turbo form benchmark scopes** — the Turbo benchmark now offers three
   comparisons: personal history, players you have shared at least two games
-  with, and every other player in your parsed Turbo games. All scopes use the
-  local parsed history and state their sample source; OpenDota has no global
+  with, and every other player in your parsed Turbo games. The personal recent
+  window grows up to 20 games while keeping an earlier baseline. All scopes use
+  the local parsed history and state their sample source; OpenDota has no global
   Turbo benchmark split.
 - **Persistent Turbo history** — locally parsed Turbo games are stored in
   `worker/data/turbo-history.json`; player, hero and My matches views merge them

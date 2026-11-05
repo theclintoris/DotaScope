@@ -440,8 +440,12 @@ export function TurboBenchmark({
         .sort((a, b) => b.start_time - a.start_time),
     [matches],
   )
-  const latest = useMemo(() => sample.slice(0, 5), [sample])
-  const personalBaseline = useMemo(() => sample.slice(5), [sample])
+  const latestCount = useMemo(
+    () => Math.min(20, Math.max(5, sample.length - 5)),
+    [sample.length],
+  )
+  const latest = useMemo(() => sample.slice(0, latestCount), [latestCount, sample])
+  const personalBaseline = useMemo(() => sample.slice(latestCount), [latestCount, sample])
   const [scope, setScope] = useState<TurboBenchmarkScope>('personal')
   const [friendSample, setFriendSample] = useState<RecentMatch[]>([])
   const [friendLoading, setFriendLoading] = useState(false)
@@ -600,7 +604,7 @@ export function TurboBenchmark({
   if (longLosses.length >= 2) {
     flags.push({
       title: 'Late Turbo games slipping',
-      detail: `${longLosses.length} of your last five Turbo games were 40+ minute losses. Review late-game buyback and objective timing.`,
+      detail: `${longLosses.length} of your last ${latest.length} Turbo games were 40+ minute losses. Review late-game buyback and objective timing.`,
       matchId: longLosses[0].match_id,
       tone: 'warn',
       icon: <Clock3 size={16} />,
@@ -612,7 +616,7 @@ export function TurboBenchmark({
       <SectionHeading
         eyebrow="Turbo benchmark"
         title="Turbo games, benchmarked"
-        hint={`latest 5 vs ${comparisonLabel}`}
+        hint={`latest ${latest.length}${latest.length < 20 ? ' · building to 20' : ''} vs ${comparisonLabel}`}
         action={
           <span className="badge badge-muted">
             <ShieldCheck size={12} /> {TURBO_SCOPE_LABELS[scope]}
@@ -635,7 +639,7 @@ export function TurboBenchmark({
         ))}
         <span className="benchmark-scope-note">
           {scope === 'personal'
-            ? 'Your latest five games against your earlier Turbo history.'
+            ? `Your latest ${latest.length} games against your earlier Turbo history.`
             : scope === 'friends'
               ? 'Players you have shared at least two games with; their recent Turbo sample.'
               : 'Every other player in your locally parsed Turbo games.'}
@@ -660,7 +664,7 @@ export function TurboBenchmark({
                 <span>{scoreBand(overall)}</span>
               </div>
               <p>
-                Latest five Turbo games ({wins}-{latest.length - wins}) compared with{' '}
+                Latest {latest.length} Turbo games ({wins}-{latest.length - wins}) compared with{' '}
                 {scope === 'personal'
                   ? 'your earlier Turbo history'
                   : scope === 'friends'
@@ -707,7 +711,7 @@ export function TurboBenchmark({
 
           <p className="panel-footnote">
             {scope === 'personal'
-              ? 'OpenDota has no global Turbo benchmark split. This compares your latest five parsed Turbo games with your earlier Turbo history. Local parser games join the sample automatically; small samples are noisy.'
+              ? `OpenDota has no global Turbo benchmark split. This compares your latest ${latest.length} parsed Turbo games with your earlier Turbo history. Local parser games join the sample automatically; small samples are noisy.`
               : scope === 'friends'
                 ? 'Frequent teammates are players with at least two shared games. Their latest OpenDota Turbo games form the baseline; this measures your form against the people you queue with, not a global percentile.'
                 : 'The lobby baseline uses every other player in your locally parsed Turbo matches, teammates and opponents. It is a same-games peer benchmark, not a global percentile.'}
@@ -758,8 +762,8 @@ export function TurboBenchmark({
           ) : null}
 
           <p className="panel-footnote">
-            Form scores are relative to your own Turbo baseline, not a global percentile. At least six parsed
-            Turbo games are required before the benchmark appears.
+            Form scores are relative to your own Turbo baseline, not a global percentile. The sample is your
+            latest {latest.length} parsed Turbo games, capped at 20, with the rest forming the baseline.
           </p>
         </div>
       </div>

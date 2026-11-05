@@ -32,6 +32,10 @@ const SEVEN_ZIP_BIN = process.env.SEVEN_ZIP_BIN ?? 'C:\\Program Files\\7-Zip\\7z
 const JAVA_TMP_DIR = join(DATA_DIR, 'java-tmp')
 const TURBO_HISTORY_PATH = join(DATA_DIR, 'turbo-history.json')
 const RANKED_HISTORY_PATH = join(DATA_DIR, 'ranked-history.json')
+const TURBO_ELO_PATH = join(DATA_DIR, 'turbo-elo.json')
+const ELO_BASELINE = 1000
+const ELO_K = 32
+const ELO_MAX_HISTORY = 200
 
 mkdirSync(DATA_DIR, { recursive: true })
 mkdirSync(JAVA_TMP_DIR, { recursive: true })
@@ -542,9 +546,34 @@ function historyRows(stats) {
       last_hits: player.lastHits,
       denies: player.denies,
       hero_damage: player.heroDamage,
+      personaname: player.personaname ?? null,
       source: 'local-parser',
     }))
 }
+
+function loadTurboNames() {
+  const names = new Map()
+  try {
+    for (const file of readdirSync(DATA_DIR)) {
+      if (!file.endsWith('.stats.json')) continue
+      try {
+        const stats = JSON.parse(readFileSync(join(DATA_DIR, file), 'utf8'))
+        for (const player of stats.players ?? []) {
+          if (player.accountId && player.personaname) {
+            names.set(Number(player.accountId), player.personaname)
+          }
+        }
+      } catch {
+        // A partially written stats file should not block the ledger.
+      }
+    }
+  } catch {
+    // The first parse will populate names.
+  }
+  return names
+}
+
+const turboNames = loadTurboNames()
 
 function recordHistory(path, stats) {
   const history = loadHistory(path)
@@ -569,6 +598,14 @@ function recordRankedHistory(stats) {
 function recordParsedHistories(stats) {
   recordTurboHistory(stats)
   recordRankedHistory(stats)
+  for (const player of stats.players ?? []) {
+    if (player.accountId && player.personaname) {
+      turboNames.set(Number(player.accountId), player.personaname)
+    }
+  }
+  if (Number(stats?.match?.gameMode) === 23) {
+    try { ensureTurboElo() } catch { /* history remains usable */ }
+  }
 }
 
 function historyFor(path, accountId, limit) {
@@ -600,6 +637,169 @@ function turboHistoryWithPeers(accountId, limit) {
 
 function rankedHistoryFor(accountId, limit) {
   return historyFor(RANKED_HISTORY_PATH, accountId, limit)
+}
+
+function emptyTurboEloState() {
+  return {
+    version: 1,
+    baseline: ELO_BASELINE,
+    players: {},
+    processed: {},
+    history: {},
+    updatedAt: 0,
+  }
+}
+
+function loadTurboEloState() {
+  if (!existsSync(TURBO_ELO_PATH)) return emptyTurboEloState()
+  try {
+    const parsed = JSON.parse(readFileSync(TURBO_ELO_PATH, 'utf8'))
+    return {
+      ...emptyTurboEloState(),
+      ...parsed,
+      baseline: ELO_BASELINE,
+      players: parsed.players ?? {},
+      processed: parsed.processed ?? {},
+      history: parsed.history ?? {},
+    }
+  } catch {
+    return emptyTurboEloState()
+  }
+}
+
+function saveTurboEloState(state) {
+  const temporary = `${TURBO_ELO_PATH}.tmp`
+  writeFileSync(temporary, `${JSON.stringify(state, null, 2)}\n`)
+  renameSync(temporary, TURBO_ELO_PATH)
+}
+
+let turboEloState = null
+
+function ensureTurboElo() {
+  if (!turboEloState) turboEloState = loadTurboEloState()
+  const groups = new Map()
+  for (const row of loadHistory(TURBO_HISTORY_PATH)) {
+    const matchId = String(row.match_id)
+    const bucket = groups.get(matchId) ?? []
+    bucket.push(row)
+    groups.set(matchId, bucket)
+  }
+
+  const matches = [...groups.values()]
+    .map((rows) => ({
+      rows,
+      start: Math.max(...rows.map((row) => Number(row.start_time) || 0)),
+    }))
+    .sort((a, b) => a.start - b.start)
+
+  let changed = false
+  for (const { rows, start } of matches) {
+    const matchKey = String(rows[0]?.match_id ?? '')
+    if (!matchKey || turboEloState.processed[matchKey]) continue
+    const byAccount = new Map()
+    for (const row of rows) {
+      const accountId = Number(row.account_id)
+      if (!Number.isFinite(accountId) || accountId <= 0) continue
+      byAccount.set(accountId, row)
+    }
+    if (byAccount.size !== 10) continue
+    const uniqueRows = [...byAccount.entries()].map(([accountId, row]) => ({ ...row, account_id: accountId }))
+    const radiant = uniqueRows.filter((row) => Number(row.player_slot) < 128)
+    const dire = uniqueRows.filter((row) => Number(row.player_slot) >= 128)
+    if (radiant.length !== 5 || dire.length !== 5) continue
+
+    const ratingOf = (accountId) =>
+      Number(turboEloState.players[String(accountId)]?.rating ?? ELO_BASELINE)
+    const radiantAverage = radiant.reduce((sum, row) => sum + ratingOf(row.account_id), 0) / 5
+    const direAverage = dire.reduce((sum, row) => sum + ratingOf(row.account_id), 0) / 5
+    const radiantExpected = 1 / (1 + 10 ** ((direAverage - radiantAverage) / 400))
+    const direExpected = 1 - radiantExpected
+    const radiantWon = Boolean(radiant[0]?.radiant_win)
+
+    for (const row of uniqueRows) {
+      const accountId = Number(row.account_id)
+      const key = String(accountId)
+      const isRadiant = Number(row.player_slot) < 128
+      const won = isRadiant === radiantWon
+      const expected = isRadiant ? radiantExpected : direExpected
+      const delta = ELO_K * ((won ? 1 : 0) - expected)
+      const previous = turboEloState.players[key] ?? {
+        accountId,
+        rating: ELO_BASELINE,
+        games: 0,
+        wins: 0,
+        losses: 0,
+        peak: ELO_BASELINE,
+        lastDelta: 0,
+        lastMatch: null,
+        lastAt: 0,
+      }
+      const rating = previous.rating + delta
+      turboEloState.players[key] = {
+        ...previous,
+        rating,
+        games: previous.games + 1,
+        wins: previous.wins + (won ? 1 : 0),
+        losses: previous.losses + (won ? 0 : 1),
+        peak: Math.max(previous.peak, rating),
+        lastDelta: delta,
+        lastMatch: matchKey,
+        lastAt: start,
+      }
+      const playerHistory = turboEloState.history[key] ?? []
+      playerHistory.push({ matchId: matchKey, rating, delta, at: start })
+      turboEloState.history[key] = playerHistory.slice(-ELO_MAX_HISTORY)
+    }
+    turboEloState.processed[matchKey] = { at: Date.now(), startTime: start }
+    changed = true
+  }
+
+  if (changed) {
+    turboEloState.updatedAt = Date.now()
+    saveTurboEloState(turboEloState)
+  }
+  return turboEloState
+}
+
+function turboEloPlayer(state, accountId, rank, limit) {
+  const key = String(accountId)
+  const player = state.players[key]
+  const history = (state.history[key] ?? []).slice(-limit)
+  return {
+    accountId: Number(accountId),
+    personaname: turboNames.get(Number(accountId)) ?? null,
+    rating: player ? Math.round(player.rating * 10) / 10 : ELO_BASELINE,
+    games: player?.games ?? 0,
+    wins: player?.wins ?? 0,
+    losses: player?.losses ?? 0,
+    peak: player ? Math.round(player.peak * 10) / 10 : ELO_BASELINE,
+    lastDelta: player ? Math.round(player.lastDelta * 10) / 10 : 0,
+    lastMatch: player?.lastMatch ?? null,
+    lastAt: player?.lastAt ?? null,
+    rank: rank ?? null,
+    history,
+  }
+}
+
+function turboEloPayload(accountId, limit) {
+  const state = ensureTurboElo()
+  const ids = Object.keys(state.players)
+  const ordered = ids
+    .map((key) => ({ id: Number(key), rating: Number(state.players[key]?.rating ?? ELO_BASELINE) }))
+    .sort((a, b) => b.rating - a.rating)
+  const ranks = new Map(ordered.map((entry, index) => [entry.id, index + 1]))
+  const leaderboard = ordered
+    .slice(0, 12)
+    .map((entry) => turboEloPlayer(state, entry.id, ranks.get(entry.id), 0))
+  const player = accountId ? turboEloPlayer(state, accountId, ranks.get(Number(accountId)) ?? null, limit) : null
+  return {
+    baseline: ELO_BASELINE,
+    matchesProcessed: Object.keys(state.processed).length,
+    playersTracked: ids.length,
+    updatedAt: state.updatedAt,
+    player,
+    leaderboard,
+  }
 }
 
 const BACKFILL_LIMIT = 500
@@ -728,6 +928,12 @@ const server = createServer(async (req, res) => {
       const limit = Math.max(1, Math.min(5000, Number(url.searchParams.get('limit') ?? 1000) || 1000))
       const matches = rankedHistoryFor(accountId, limit)
       return json(res, 200, { accountId, count: matches.length, matches })
+    }
+
+    if (req.method === 'GET' && url.pathname === '/turbo-elo') {
+      const accountId = Number(url.searchParams.get('accountId') ?? 0) || null
+      const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit') ?? 100) || 100))
+      return json(res, 200, turboEloPayload(accountId, limit))
     }
 
     if (req.method === 'GET' && url.pathname === '/recent-turbo') {

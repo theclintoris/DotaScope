@@ -66,6 +66,7 @@ import {
   WinRate,
 } from '../components/ui'
 import { PerformanceReview, TurboBenchmark } from '../components/PerformanceReview'
+import { TurboEloPanel } from '../components/TurboEloPanel'
 
 type HeroSort = 'games' | 'winRate' | 'name'
 type ResultFilter = 'all' | 'wins' | 'losses'
@@ -416,7 +417,13 @@ export function PlayerDetailPage() {
       </div>
 
       {matchMode === 'turbo' ? (
-        <TurboBenchmark matches={turboRows} accountId={validId ? Number(playerId) : null} />
+        <>
+          <TurboEloPanel
+            accountId={validId ? Number(playerId) : null}
+            playerName={profile.data?.profile.personaname ?? null}
+          />
+          <TurboBenchmark matches={turboRows} accountId={validId ? Number(playerId) : null} />
+        </>
       ) : (
         <PerformanceReview matches={performanceRows} />
       )}

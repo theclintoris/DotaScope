@@ -1,0 +1,329 @@
+.turbo-elo-panel {
+  position: relative;
+  overflow: hidden;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(circle at 92% 0%, rgba(235, 169, 74, 0.09), transparent 34%),
+    linear-gradient(155deg, rgba(27, 33, 42, 0.94), rgba(14, 18, 24, 0.94));
+}
+
+.turbo-elo-panel::before {
+  position: absolute;
+  top: 0;
+  left: 22px;
+  width: 52px;
+  height: 2px;
+  content: '';
+  background: var(--accent);
+}
+
+.turbo-elo-head,
+.turbo-elo-score-row,
+.turbo-elo-leaderboard-head,
+.turbo-elo-meta,
+.turbo-elo-row,
+.turbo-elo-game {
+  display: flex;
+  align-items: center;
+}
+
+.turbo-elo-head {
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.turbo-elo-head h2 {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(24px, 2.2vw, 34px);
+  letter-spacing: -0.02em;
+}
+
+.turbo-elo-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  gap: 24px;
+}
+
+.turbo-elo-main {
+  min-width: 0;
+}
+
+.turbo-elo-score-row {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.turbo-elo-rating {
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: clamp(52px, 6vw, 78px);
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+}
+
+.turbo-elo-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.turbo-elo-delta.is-up,
+.turbo-elo-row-delta.is-up,
+.turbo-elo-game-dot.is-up {
+  color: var(--good);
+}
+
+.turbo-elo-delta.is-down,
+.turbo-elo-row-delta.is-down,
+.turbo-elo-game-dot.is-down {
+  color: var(--bad);
+}
+
+.turbo-elo-rank {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 34px;
+  line-height: 1;
+  text-align: right;
+}
+
+.turbo-elo-rank small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.turbo-elo-spark-wrap {
+  margin-top: 16px;
+  padding: 12px 14px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: rgba(7, 10, 14, 0.3);
+}
+
+.turbo-elo-spark {
+  display: block;
+  width: 100%;
+  height: 74px;
+  overflow: visible;
+}
+
+.turbo-elo-spark polyline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.turbo-elo-meta {
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.turbo-elo-games {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.turbo-elo-game {
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.03em;
+  text-decoration: none;
+}
+
+.turbo-elo-game:hover {
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.turbo-elo-game-dot {
+  font-weight: 700;
+}
+
+.turbo-elo-leaderboard {
+  min-width: 0;
+  padding-left: 22px;
+  border-left: 1px solid var(--line-soft);
+}
+
+.turbo-elo-leaderboard-head {
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.turbo-elo-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.turbo-elo-row {
+  min-width: 0;
+  gap: 8px;
+  min-height: 38px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.turbo-elo-row:last-child {
+  border-bottom: 0;
+}
+
+.turbo-elo-row.is-you {
+  margin: 2px -8px;
+  padding: 0 8px;
+  border-radius: 4px;
+  background: rgba(235, 169, 74, 0.065);
+}
+
+.turbo-elo-place {
+  width: 20px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-align: right;
+}
+
+.turbo-elo-name {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.turbo-elo-name a,
+.turbo-elo-name > span {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.turbo-elo-name small {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.turbo-elo-row > strong {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.turbo-elo-row-delta {
+  width: 42px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  text-align: right;
+}
+
+.turbo-elo-row-self {
+  margin-top: 4px;
+}
+
+.turbo-elo-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 18px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.turbo-elo-note svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--accent);
+}
+
+@media (max-width: 820px) {
+  .turbo-elo-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .turbo-elo-leaderboard {
+    padding-top: 18px;
+    padding-left: 0;
+    border-top: 1px solid var(--line-soft);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .turbo-elo-panel {
+    padding: 18px;
+  }
+
+  .turbo-elo-panel::before {
+    left: 18px;
+  }
+
+  .turbo-elo-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .turbo-elo-head .badge {
+    align-self: flex-start;
+  }
+
+  .turbo-elo-rating {
+    font-size: 58px;
+  }
+
+  .turbo-elo-rank {
+    font-size: 28px;
+  }
+
+  .turbo-elo-games {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .turbo-elo-game {
+    justify-content: space-between;
+  }
+}
