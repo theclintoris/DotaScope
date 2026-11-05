@@ -9,6 +9,8 @@ A dark, installable statistics cockpit for PC and Android, built on the OpenDota
 
 DotaScope brings hero meta, matchups, professional play, player dossiers, match scoreboards, historical records and a read-only SQL lab into one responsive app. It ships as a native **Android APK**, a **standalone Windows EXE**, and a progressive web app (PWA) for any modern browser.
 
+**[Download the latest build](https://github.com/theclintoris/DotaScope/releases/latest)** · **[Browse the source](https://github.com/theclintoris/DotaScope)**
+
 ## What is included
 
 - **Meta lens** — switch between ranked pubs, pro and turbo populations, and ranked brackets 1–7. The choice is shared across every page and remembered locally.
