@@ -205,6 +205,44 @@ export interface PlayerHero {
   against_win: number
 }
 
+export interface PlayerMatch {
+  match_id: number
+  player_slot: number
+  radiant_win: boolean
+  hero_id: number
+  start_time: number
+  duration: number
+  game_mode: number
+  lobby_type: number
+  version: number | null
+  kills: number
+  deaths: number
+  assists: number
+  average_rank: number | null
+  leaver_status: number
+  party_size: number | null
+  hero_variant: number | null
+}
+
+export interface PeerPlayer {
+  account_id: number
+  last_played: number | null
+  win: number
+  games: number
+  with_win: number
+  with_games: number
+  against_win: number
+  against_games: number
+  with_gpm_sum?: number
+  with_xpm_sum?: number
+  personaname: string | null
+  name: string | null
+  avatar: string | null
+  avatarfull: string | null
+  is_contributor?: boolean
+  is_subscriber?: boolean
+}
+
 export interface RecentMatch {
   match_id: number
   player_slot: number

@@ -54,6 +54,7 @@ const SECTION_META: { match: (path: string) => boolean; kicker: string; title: s
   { match: (path) => path.startsWith('/heroes'), kicker: 'Meta index', title: 'Heroes' },
   { match: (path) => /^\/matches\/[^/]+/.test(path), kicker: 'Match dossier', title: 'Match detail' },
   { match: (path) => path.startsWith('/matches'), kicker: 'Live feed', title: 'Matches' },
+  { match: (path) => /^\/players\/[^/]+\/heroes\/[^/]+/.test(path), kicker: 'Player hero', title: 'Hero dossier' },
   { match: (path) => path.startsWith('/players/'), kicker: 'Player dossier', title: 'Player profile' },
   { match: (path) => path.startsWith('/players'), kicker: 'Identity search', title: 'Players' },
   { match: (path) => path.startsWith('/pro'), kicker: 'Circuit intelligence', title: 'Pro scene' },

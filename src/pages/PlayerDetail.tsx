@@ -19,6 +19,7 @@ import {
   Zap,
 } from 'lucide-react'
 import type {
+  PeerPlayer,
   PlayerHero,
   PlayerProfile,
   PlayerWinLoss,
@@ -38,6 +39,7 @@ import {
   formatNumber,
   formatPercent,
   formatUnixTime,
+  timeAgo,
   timeAgoFromIso,
 } from '../lib/format'
 import {
@@ -53,6 +55,8 @@ import {
 
 type HeroSort = 'games' | 'winRate' | 'name'
 type ResultFilter = 'all' | 'wins' | 'losses'
+type PeerSort = 'games' | 'winRate'
+const PEER_PAGE_SIZE = 8
 const LANE_LABELS: Record<number, string> = {
   1: 'Safe lane',
   2: 'Mid lane',
@@ -69,6 +73,7 @@ export function PlayerDetailPage() {
   const wl = useRemote<PlayerWinLoss>(validId ? `/players/${playerId}/wl` : null, TTL.player)
   const heroes = useRemote<PlayerHero[]>(validId ? `/players/${playerId}/heroes` : null, TTL.player)
   const recent = useRemote<RecentMatch[]>(validId ? `/players/${playerId}/recentMatches` : null, TTL.player)
+  const peers = useRemote<PeerPlayer[]>(validId ? `/players/${playerId}/peers` : null, TTL.player)
   useDocumentTitle(profile.data?.profile.personaname ?? 'Player')
   const [heroFilter, setHeroFilter] = useState('')
   const [minGames, setMinGames] = useState(1)
@@ -76,6 +81,8 @@ export function PlayerDetailPage() {
   const [heroLimit, setHeroLimit] = useState(PAGE_SIZE)
   const [resultFilter, setResultFilter] = useState<ResultFilter>('all')
   const [matchHeroFilter, setMatchHeroFilter] = useState('')
+  const [peerSort, setPeerSort] = useState<PeerSort>('games')
+  const [peerLimit, setPeerLimit] = useState(PEER_PAGE_SIZE)
 
   const heroMap = useMemo(() => new Map(meta.heroes.map((hero) => [hero.id, hero])), [meta.heroes])
 
@@ -132,6 +139,16 @@ export function PlayerDetailPage() {
       return true
     })
   }, [recentRows, resultFilter, matchHeroFilter, heroMap])
+
+  const peerRows = useMemo(() => {
+    const rows = (peers.data ?? []).filter((peer) => peer.with_games > 0)
+    return rows.sort((a, b) => {
+      if (peerSort === 'winRate') {
+        return (b.with_win / Math.max(b.with_games, 1)) - (a.with_win / Math.max(a.with_games, 1))
+      }
+      return b.with_games - a.with_games
+    })
+  }, [peers.data, peerSort])
 
   const attributeMix = useMemo(() => {
     const buckets = new Map<string, { games: number; wins: number }>()
@@ -345,9 +362,14 @@ export function PlayerDetailPage() {
                       return (
                         <tr key={row.hero_id}>
                           <td>
-                            <Link to={`/heroes/${row.hero_id}`} className="table-hero">
+                            <Link
+                              to={`/players/${playerId}/heroes/${row.hero_id}`}
+                              className="table-hero"
+                              title={`Open ${player.personaname || 'player'}'s ${row.hero?.localized_name ?? 'hero'} dossier`}
+                            >
                               <HeroPortrait hero={row.hero} size="xs" />
                               <span>{row.hero?.localized_name}</span>
+                              <ArrowUpRight size={12} className="row-arrow" />
                             </Link>
                           </td>
                           <td className="num mono">{formatNumber(row.games)}</td>
@@ -374,6 +396,72 @@ export function PlayerDetailPage() {
               </div>
             )}
             <p className="panel-footnote">Hero pool stats include all parsed matches OpenDota has indexed for this account. Win rate is not bracket-normalized.</p>
+          </section>
+
+          <section className="panel squad-panel">
+            <SectionHeading
+              eyebrow="Squad performance"
+              title="Friends & frequent teammates"
+              hint={peers.data ? `${formatNumber(peerRows.length)} public peers` : 'OpenDota peer history'}
+              action={
+                <div className="segmented segmented-sm">
+                  <button className={peerSort === 'games' ? 'is-active' : ''} onClick={() => setPeerSort('games')}>Most games</button>
+                  <button className={peerSort === 'winRate' ? 'is-active' : ''} onClick={() => setPeerSort('winRate')}>Best WR</button>
+                </div>
+              }
+            />
+            <p className="squad-lede">
+              How this account performs when queued with the people it plays with most. Open a teammate to inspect their own dossier.
+            </p>
+            {peers.loading && !peers.data ? (
+              <div className="squad-grid">
+                {[0, 1, 2, 3].map((key) => <span className="skeleton squad-skeleton" key={key} />)}
+              </div>
+            ) : peers.error && !peers.data ? (
+              <ErrorState error={peers.error} onRetry={peers.refresh} title="Teammate history unavailable" />
+            ) : peerRows.length === 0 ? (
+              <EmptyState title="No public teammate history" icon={<Users size={20} />}>
+                OpenDota does not have parsed games with repeat teammates for this account.
+              </EmptyState>
+            ) : (
+              <>
+                <div className="squad-grid">
+                  {peerRows.slice(0, peerLimit).map((peer) => {
+                    const winRate = peer.with_games ? peer.with_win / peer.with_games : 0
+                    const avgGpm = peer.with_games && peer.with_gpm_sum
+                      ? Math.round(peer.with_gpm_sum / peer.with_games)
+                      : null
+                    return (
+                      <Link className="squad-card" to={`/players/${peer.account_id}`} key={peer.account_id}>
+                        <PlayerAvatar src={peer.avatarfull ?? peer.avatar} name={peer.personaname ?? peer.name ?? 'Player'} size="md" />
+                        <div className="squad-card-copy">
+                          <div className="squad-card-top">
+                            <strong>{peer.personaname || peer.name || `Account ${peer.account_id}`}</strong>
+                            <span className={classNames('squad-rate', winRate >= 0.5 ? 'text-good' : 'text-bad')}>{formatPercent(winRate)}</span>
+                          </div>
+                          <span>{formatNumber(peer.with_games)} games together · {formatNumber(peer.with_win)} wins</span>
+                          <small>
+                            Last queued {timeAgo(peer.last_played)}
+                            {avgGpm != null ? ` · ${formatNumber(avgGpm)} avg GPM` : ''}
+                          </small>
+                        </div>
+                        <ArrowUpRight size={14} className="squad-arrow" />
+                      </Link>
+                    )
+                  })}
+                </div>
+                {peerRows.length > peerLimit && (
+                  <div className="load-more-row">
+                    <button className="btn btn-ghost btn-sm" onClick={() => setPeerLimit((limit) => limit + PEER_PAGE_SIZE)}>
+                      Show more teammates <span>{formatNumber(peerRows.length - peerLimit)} remaining</span>
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+            <p className="panel-footnote">
+              Built from OpenDota&apos;s public peer history, not Steam&apos;s private friends list. Win rate is the duo&apos;s record when queued together.
+            </p>
           </section>
 
           <section className="panel">
@@ -439,9 +527,14 @@ export function PlayerDetailPage() {
                             </Link>
                           </td>
                           <td>
-                            <Link to={`/heroes/${match.hero_id}`} className="table-hero">
+                            <Link
+                              to={`/players/${playerId}/heroes/${match.hero_id}`}
+                              className="table-hero"
+                              title={`Open ${player.personaname || 'player'}'s hero dossier`}
+                            >
                               <HeroPortrait hero={hero} size="xs" />
                               <span>{hero?.localized_name ?? `Hero ${match.hero_id}`}</span>
+                              <ArrowUpRight size={12} className="row-arrow" />
                             </Link>
                           </td>
                           <td className="mono">{match.kills} / {match.deaths} / {match.assists}</td>

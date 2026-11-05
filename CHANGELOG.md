@@ -22,6 +22,12 @@ Android and the web, built on the OpenDota public API.
   draft boards.
 - **Player intelligence** — global player search, pro directory, career record,
   ranked medal, estimated MMR, form log, hero pool, lane mix and attribute mix.
+- **Player hero dossier** — per-hero win rate, recent form, KDA, final-item
+  telemetry, sampled builds and a full paginated match archive reached by
+  clicking a hero in any player dossier.
+- **Squad performance** — public peer history showing frequent teammates, games
+  together, duo win rate, last queued and average GPM. This is OpenDota's public
+  peer data, not Steam's private friends list.
 - **Pinned profile** — save a public Dota profile locally. The pinned dossier
   appears above the Players directory and as a compact strip on Overview.
 - **Steam account connection** — the Windows app reads the active Steam account

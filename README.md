@@ -21,6 +21,8 @@ DotaScope brings hero meta, matchups, professional play, player dossiers, match 
 - **Match detail** — gold/XP advantage chart, both scoreboards, items, KDA, GPM/XPM, last hits/denies, damage and a pick/ban draft board.
 - **Players** — global OpenDota player search, numeric account shortcut, and a searchable professional directory.
 - **Player profile** — career W/L, rank, estimated MMR, recent form, hero pool, match log, lane mix and attribute comfort.
+- **Player hero dossier** — click any hero in a player's pool or match log for hero-specific win rate, form, KDA, final-item telemetry, recent builds and the full paginated match archive on that hero.
+- **Squad performance** — a player's most frequent public teammates, with games together, duo win rate, last queued and average GPM, sortable by games or win rate. This uses OpenDota's public peer history, not Steam's private friends list.
 - **Your profile** — pin your own dossier above the Players directory and keep a compact form/record strip on Overview. The Windows app picks up the active Steam account automatically; the web app offers Steam sign-in plus a manual profile fallback.
 - **Pro scene** — team Elo-style power index, active-team filters, latest series results and a pro hero draft-presence board.
 - **Records** — twelve historical record books across parsed public matches.
@@ -161,6 +163,7 @@ Dotabuff does not publish a general public API. **This is not a pixel-for-pixel 
 - **Hero brackets** — `/heroStats` publishes bracket aggregates 1–7. There is no useful Immortal (bracket 8) sample, so the UI omits it. OpenDota's overall bracket win rates can sit at exactly 50% because of how the feed is normalized; per-hero rates still vary.
 - **Pro data** — the pro feed is the latest ~100 matches, not a complete circuit archive. Some fields Dotabuff shows (notably game mode for pro matches) are absent, so DotaScope does not invent them.
 - **Records** — only parsed public matches. Unparsed and private games are excluded.
+- **Friends / squad** — Steam does not expose a player's private friend list to a client-only OpenDota app. DotaScope shows OpenDota's public `peers` history instead (the people you queue with most) and labels it honestly.
 - **Public feed** — the latest 100 matches; direct match-ID lookup is available for older games.
 - **Parsing** — some matches are unparsed, so items, drafts and economy charts can be incomplete. Item/ability constants come from OpenDota/Valve.
 - **Explorer** — the Data Lab is read-only, limited to the tables OpenDota exposes, and truncates/append `LIMIT 100` where needed. Heavy queries can time out.

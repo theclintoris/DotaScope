@@ -9,6 +9,7 @@ import { MatchesPage } from './pages/Matches'
 import { MatchDetailPage } from './pages/MatchDetail'
 import { PlayersPage } from './pages/Players'
 import { PlayerDetailPage } from './pages/PlayerDetail'
+import { PlayerHeroDetailPage } from './pages/PlayerHeroDetail'
 import { ProPage } from './pages/Pro'
 import { RecordsPage } from './pages/Records'
 import { DataLabPage } from './pages/DataLab'
@@ -29,6 +30,7 @@ function App() {
               <Route path="matches/:matchId" element={<MatchDetailPage />} />
               <Route path="players" element={<PlayersPage />} />
               <Route path="players/:playerId" element={<PlayerDetailPage />} />
+              <Route path="players/:playerId/heroes/:heroId" element={<PlayerHeroDetailPage />} />
               <Route path="pro" element={<ProPage />} />
               <Route path="records" element={<RecordsPage />} />
               <Route path="data-lab" element={<DataLabPage />} />
