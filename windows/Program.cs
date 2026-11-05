@@ -374,10 +374,12 @@ internal sealed class MainForm : Form
         catch (Exception ex)
         {
             Program.Log("webview init failed: " + ex);
+            string message = ex.HResult == unchecked((int)0x8007139F)
+                ? "DotaScope could not open its WebView2 window because another instance or WebView2 process is still using its profile. Close DotaScope, wait a moment, and try again.\n\n" + ex.Message
+                : "DotaScope requires the Microsoft Edge WebView2 runtime.\n\n" +
+                  "Install it from https://developer.microsoft.com/microsoft-edge/webview2/ and try again.\n\n" + ex.Message;
             MessageBox.Show(
-                "DotaScope requires the Microsoft Edge WebView2 runtime.\n\n" +
-                "Install it from https://developer.microsoft.com/microsoft-edge/webview2/ and try again.\n\n" +
-                ex.Message,
+                message,
                 "DotaScope could not start",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);

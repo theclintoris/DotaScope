@@ -39,6 +39,13 @@ All notable changes to DotaScope are recorded here. The public release lives at
 - README documents Immortal, replay parsing, API key security, and the
   Source/attribution for Spectral.
 
+### Fixed
+
+- The Windows launcher is now single-instance. Launching DotaScope again — including
+  from the Steam shortcut — focuses the running window instead of starting a second
+  WebView2 host against an in-use profile, which previously surfaced a misleading
+  `0x8007139F` "requires WebView2" error.
+
 ## [1.0.0] — 2026-11-05
 
 The first public release of DotaScope: a Dota 2 statistics cockpit for Windows,

@@ -96,6 +96,8 @@ The native builds are bundled in this project:
 
 The EXE is a portable launcher with the full WebView2 app embedded inside. It chooses a writable data directory (`%LOCALAPPDATA%\DotaScope`, then `%APPDATA%\DotaScope`, then a `data` folder beside the EXE), sets its own extraction paths, and starts the host. You do **not** need to set `DOTNET_BUNDLE_EXTRACT_BASE_DIR` manually. Launching from the installed Steam shortcut uses the same launcher and picks up the active Steam account.
 
+The Windows launcher is single-instance. If a DotaScope window is already open, launching the EXE or pressing **Play** in Steam focuses that window instead of opening a second WebView2 host against a locked profile. After installing an update, close the existing DotaScope window and launch again to load the new build. If Windows still reports a WebView2 state error, close all DotaScope/WebView2 processes and retry.
+
 **Android:** enable installing unknown apps for your browser/file manager, open the APK, and confirm the install. It is signed with the project's local release key (CN=DotaScope); this key is not included in the repository. The APK has been signature- and manifest-verified, but was not run on a physical device or emulator in this environment.
 
 Both native wrappers load the same bundled web build and use the public OpenDota API directly. Player search and player profiles were verified in the Windows app against account `295731192`; hero data, matches and every filter use the same packaged frontend. The service worker is disabled in both wrappers so assets always come from the bundled build.

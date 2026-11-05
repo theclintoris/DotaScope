@@ -2,7 +2,9 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Threading;
 using System.Windows.Forms;
 
 [assembly: AssemblyTitle("DotaScope")]
@@ -17,9 +19,32 @@ namespace DotaScopeLauncher
     internal static class Program
     {
         private const string ResourceName = "DotaScope.App";
+        private const string InstanceMutexName = @"Local\DotaScope.SingleInstance";
+        private const int SwRestore = 9;
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr window);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindowAsync(IntPtr window, int command);
 
         [STAThread]
         private static int Main(string[] args)
+        {
+            bool createdNew;
+            using (Mutex mutex = new Mutex(true, InstanceMutexName, out createdNew))
+            {
+                if (!createdNew)
+                {
+                    FocusRunningInstance();
+                    return 0;
+                }
+
+                return Run(args);
+            }
+        }
+
+        private static int Run(string[] args)
         {
             try
             {
@@ -97,6 +122,39 @@ namespace DotaScopeLauncher
                     MessageBoxIcon.Error);
                 return 1;
             }
+        }
+
+        private static void FocusRunningInstance()
+        {
+            for (int attempt = 0; attempt < 20; attempt++)
+            {
+                Process[] processes = Process.GetProcessesByName("DotaScope-app");
+                foreach (Process process in processes)
+                {
+                    try
+                    {
+                        IntPtr window = process.MainWindowHandle;
+                        if (window != IntPtr.Zero)
+                        {
+                            ShowWindowAsync(window, SwRestore);
+                            SetForegroundWindow(window);
+                            return;
+                        }
+                    }
+                    finally
+                    {
+                        process.Dispose();
+                    }
+                }
+
+                Thread.Sleep(150);
+            }
+
+            MessageBox.Show(
+                "DotaScope is already running. Close the existing window before starting another instance.",
+                "DotaScope",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
         private static string FindWritableRoot(string preferred)
