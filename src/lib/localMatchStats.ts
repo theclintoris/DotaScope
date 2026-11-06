@@ -22,6 +22,7 @@ export interface LocalParsedPlayer {
   xpPerMin: number
   heroDamage: number
   towerDamage: number
+  heroHealing: number
   stuns: number
   obsPlaced: number
   senPlaced: number
@@ -136,7 +137,8 @@ export function mergeLocalMatch(match: MatchDetail, local: LocalParsedMatch): Ma
       net_worth: finite(localPlayer.netWorth, player.net_worth),
       total_gold: finite(localPlayer.gold, player.total_gold ?? 0),
       hero_damage: finite(localPlayer.heroDamage, player.hero_damage),
-      tower_damage: finite(localPlayer.towerDamage, player.tower_damage),
+      tower_damage: localPlayer.towerDamage > 0 ? localPlayer.towerDamage : finite(player.tower_damage, 0),
+      hero_healing: localPlayer.heroHealing > 0 ? localPlayer.heroHealing : finite(player.hero_healing, 0),
       stuns: finite(localPlayer.stuns, player.stuns ?? 0),
       obs_placed: finite(localPlayer.obsPlaced, player.obs_placed ?? 0),
       sen_placed: finite(localPlayer.senPlaced, player.sen_placed ?? 0),

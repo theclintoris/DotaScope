@@ -73,7 +73,8 @@ All notable changes to DotaScope are recorded here. The public release lives at
   Download Replay.
 - **Personal record books** — the Records page now surfaces the pinned
   profile's best kills, deaths, assists, KDA, longest game, longest win streak,
-  and (for parsed Ranked or Turbo games) GPM/XPM/last hits/hero damage. The book
+  and (for parsed Ranked or Turbo games) GPM/XPM/last hits/hero damage/hero
+  healing/tower damage. The book
   follows the global Ranked/Turbo lens and can be filtered to a single hero;
   ranked records page through the account's available ranked history, while
   Turbo combines the latest-20 sample with local parsed history.

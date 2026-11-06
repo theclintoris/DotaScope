@@ -303,6 +303,7 @@ async function summarise(rawPath, matchId) {
         xpPerMin: duration > 0 ? Math.round((xp / duration) * 60) : 0,
         heroDamage: asNumber(row.hero_damage),
         towerDamage: asNumber(row.tower_damage),
+        heroHealing: asNumber(row.hero_healing ?? row.hero_healing_t),
         stuns: Number(asNumber(row.stuns).toFixed(2)),
         obsPlaced: asNumber(row.obs_placed),
         senPlaced: asNumber(row.sen_placed),
@@ -546,6 +547,8 @@ function historyRows(stats) {
       last_hits: player.lastHits,
       denies: player.denies,
       hero_damage: player.heroDamage,
+      tower_damage: player.towerDamage,
+      hero_healing: player.heroHealing ?? 0,
       personaname: player.personaname ?? null,
       source: 'local-parser',
     }))

@@ -345,9 +345,16 @@ function PersonalRecordsSection() {
     [recent.data, turboHistory.rows],
   )
   const rankedPerformanceRows = useMemo(() => {
-    const base = rankedHistory.rows.filter((match) => match.game_mode === 22 && match.lobby_type === 7)
+    const merged = new Map<number, RecentMatch>()
+    for (const match of recent.data ?? []) {
+      if (match.game_mode === 22 && match.lobby_type === 7) merged.set(match.match_id, match)
+    }
+    for (const match of rankedHistory.rows) {
+      if (match.game_mode === 22 && match.lobby_type === 7) merged.set(match.match_id, match)
+    }
+    const base = [...merged.values()]
     return heroId === 'all' ? base : base.filter((match) => match.hero_id === Number(heroId))
-  }, [rankedHistory.rows, heroId])
+  }, [rankedHistory.rows, recent.data, heroId])
   const rows = useMemo(() => {
     const base: MatchSummary[] = mode === 'ranked' ? ranked.rows : turboRows
     const filtered = heroId === 'all' ? base : base.filter((match) => match.hero_id === Number(heroId))
@@ -395,6 +402,12 @@ function PersonalRecordsSection() {
       push(makePersonalRecord(performanceRows, 'Highest XPM', <Sparkles size={16} />, (row) => (isPerformanceMatch(row) ? row.xp_per_min : null), formatNumber, 'experience per minute'))
       push(makePersonalRecord(performanceRows, 'Most last hits', <Axe size={16} />, (row) => (isPerformanceMatch(row) ? row.last_hits : null), formatNumber, 'single game'))
       push(makePersonalRecord(performanceRows, 'Most hero damage', <Shield size={16} />, (row) => (isPerformanceMatch(row) ? row.hero_damage : null), formatNumber, 'single game'))
+      if (performanceRows.some((row) => isPerformanceMatch(row) && row.hero_healing > 0)) {
+        push(makePersonalRecord(performanceRows, 'Most hero healing', <HeartPulse size={16} />, (row) => (isPerformanceMatch(row) ? row.hero_healing : null), formatNumber, 'single game'))
+      }
+      if (performanceRows.some((row) => isPerformanceMatch(row) && row.tower_damage > 0)) {
+        push(makePersonalRecord(performanceRows, 'Most tower damage', <Castle size={16} />, (row) => (isPerformanceMatch(row) ? row.tower_damage : null), formatNumber, 'single game'))
+      }
     }
 
     return records
@@ -493,8 +506,8 @@ function PersonalRecordsSection() {
           </div>
           <p className="panel-footnote">
             Ranked records page through all ranked matches OpenDota returns for the account; Turbo records use the
-            latest 20-match sample plus every Turbo game parsed by your local worker. GPM, XPM, last hits and hero
-            damage appear only for parsed Ranked or Turbo games.
+            latest 20-match sample plus every Turbo game parsed by your local worker. GPM, XPM, last hits, hero damage,
+            hero healing and tower damage appear only for parsed Ranked or Turbo games.
           </p>
         </>
       )}

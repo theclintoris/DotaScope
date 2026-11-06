@@ -21,6 +21,8 @@ export interface TurboHistoryRow {
   last_hits: number
   denies: number
   hero_damage: number
+  tower_damage?: number
+  hero_healing?: number
   source?: string
 }
 
@@ -46,8 +48,8 @@ export function toRecentMatch(row: TurboHistoryRow): RecentMatch {
     xp_per_min: row.xp_per_min,
     gold_per_min: row.gold_per_min,
     hero_damage: row.hero_damage,
-    tower_damage: 0,
-    hero_healing: 0,
+    tower_damage: row.tower_damage ?? 0,
+    hero_healing: row.hero_healing ?? 0,
     last_hits: row.last_hits,
     denies: row.denies,
     lane: null,
