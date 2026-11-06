@@ -123,6 +123,12 @@ All notable changes to DotaScope are recorded here. The public release lives at
   worker it started when DotaScope exits. An externally started worker is reused
   and left running. The standalone single-file build does not bundle Node, Java,
   7-Zip, the parser jar or the worker sources.
+- The local worker now watches the Dota 2 replay folder while it runs and
+  automatically parses a newly downloaded `.dem` file. This covers replays
+  downloaded manually after a match, not just games auto-parsed from the GSI
+  post-game state.
+- **Refresh match** now re-checks the local worker and shared archive as well as
+  OpenDota, so a local or shared parse loads immediately without a full reload.
 
 ## [1.0.0] — 2026-11-05
 

@@ -330,7 +330,12 @@ export function MatchDetailPage() {
                   <Database size={15} /> {parseState === 'requesting' ? 'Requesting…' : parseState === 'queued' ? 'Queued' : 'Request replay parse'}
                 </button>
               )}
-              <button type="button" className="btn btn-ghost" onClick={() => detail.refresh()}>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                title="Re-check OpenDota, the shared archive, and local parsed data"
+                onClick={() => { localStats.refresh(); detail.refresh() }}
+              >
                 Refresh match
               </button>
             </div>

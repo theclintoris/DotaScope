@@ -946,6 +946,85 @@ async function runBackfill(job) {
   job.finishedAt = new Date().toISOString()
 }
 
+const knownReplays = new Set()
+const replaySizes = new Map()
+const replayRetryAt = new Map()
+let replayScanBusy = false
+
+function demMatchId(fileName) {
+  const match = /^([0-9]{1,20})\.dem$/i.exec(fileName)
+  if (!match) return null
+  const matchId = Number(match[1])
+  return Number.isSafeInteger(matchId) && matchId > 0 ? matchId : null
+}
+
+function seedKnownReplays() {
+  try {
+    for (const file of readdirSync(REPLAY_DIR)) {
+      const matchId = demMatchId(file)
+      if (matchId) knownReplays.add(matchId)
+    }
+  } catch {
+    // Dota's replay folder may not exist on a fresh install.
+  }
+}
+
+async function scanReplayFolder() {
+  if (replayScanBusy) return
+  replayScanBusy = true
+  try {
+    let files
+    try {
+      files = readdirSync(REPLAY_DIR)
+    } catch {
+      return
+    }
+    const now = Date.now()
+    for (const file of files) {
+      const matchId = demMatchId(file)
+      if (!matchId || knownReplays.has(matchId)) continue
+      if ((replayRetryAt.get(matchId) ?? 0) > now) continue
+
+      const replay = join(REPLAY_DIR, file)
+      let size = 0
+      try {
+        const stat = statSync(replay)
+        if (!stat.isFile()) continue
+        size = stat.size
+      } catch {
+        continue
+      }
+      if (size <= 0) continue
+
+      // Wait one scan for Dota to finish writing the file.
+      if (replaySizes.get(matchId) !== size) {
+        replaySizes.set(matchId, size)
+        continue
+      }
+
+      replaySizes.delete(matchId)
+      if (existsSync(join(DATA_DIR, `${matchId}.stats.json`))) {
+        knownReplays.add(matchId)
+        continue
+      }
+
+      console.log(`New replay detected: ${file} (${size} bytes)`)
+      try {
+        await parseReplay(matchId, { force: false })
+        knownReplays.add(matchId)
+        replayRetryAt.delete(matchId)
+        console.log(`Auto-parsed replay ${matchId}`)
+      } catch (error) {
+        replayRetryAt.set(matchId, Date.now() + 30_000)
+        console.log(`Auto-parse failed for ${matchId}: ${error instanceof Error ? error.message : String(error)}`)
+      }
+      break
+    }
+  } finally {
+    replayScanBusy = false
+  }
+}
+
 const server = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
@@ -1092,6 +1171,8 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`DotaScope parser worker listening on http://127.0.0.1:${PORT}`)
   console.log(`Replay directory: ${REPLAY_DIR}`)
+  seedKnownReplays()
+  setInterval(() => { void scanReplayFolder() }, 5000).unref()
 })
 
 function shutdown() {
