@@ -77,6 +77,10 @@ export function MatchDetailPage() {
   const parsedSourceLabel = sharedParsed ? 'Shared archive' : 'Parsed locally'
   const remoteParsed = Boolean(remoteMatch?.od_data?.has_parsed)
   const parsed = remoteParsed || localParsed
+  const replayUrl = (remoteMatch as (MatchDetail & { replay_url?: string | null }) | undefined)?.replay_url
+  const noReplaySource = Boolean(
+    remoteMatch && !parsed && !localStats.loading && replayUrl === null,
+  )
   useDocumentTitle(match ? `Match #${match.match_id}` : 'Match')
 
   const heroes = useMemo(() => new Map(meta.heroes.map((hero) => [hero.id, hero])), [meta.heroes])
@@ -298,16 +302,25 @@ export function MatchDetailPage() {
         <section className="panel parse-panel">
           <SectionHeading
             eyebrow="Replay intelligence"
-            title="This match is not parsed yet"
-            hint="Parsed matches unlock wards, stacks, runes and stuns"
+            title={noReplaySource ? 'No replay source available' : 'This match is not parsed yet'}
+            hint={noReplaySource ? 'A replay is required before wards and timeline can load' : 'Parsed matches unlock wards, stacks, runes and stuns'}
             action={<span className="muted-label"><Database size={13} /> Basic match data</span>}
           />
           <div className="parse-panel-body">
             <div>
-              <p className="muted-copy">
-                OpenDota can parse the replay for deeper economy and utility data. Replay parsing
-                is a paid OpenDota feature, so it needs your own API key.
-              </p>
+              {noReplaySource ? (
+                <p className="muted-copy">
+                  DotaScope found no local or shared parse, and Valve has not published a replay URL
+                  for this match. Download the replay in Dota 2 → Profile → Match History, then the
+                  replay-folder watcher will parse it automatically. If DotaScope is open when a replay
+                  source becomes available, it is retried automatically for 24 hours.
+                </p>
+              ) : (
+                <p className="muted-copy">
+                  OpenDota can parse the replay for deeper economy and utility data. Replay parsing
+                  is a paid OpenDota feature, so it needs your own API key.
+                </p>
+              )}
               {parseError && <p className="inline-error">{parseError}</p>}
               {parseState === 'queued' && (
                 <p className="inline-alert">
@@ -316,19 +329,21 @@ export function MatchDetailPage() {
               )}
             </div>
             <div className="parse-panel-actions">
-              {!hasOpenDotaKey() ? (
-                <button type="button" className="btn btn-primary" onClick={requestParse}>
-                  <KeyRound size={15} /> Add API key
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={requestParse}
-                  disabled={parseState === 'requesting' || parseState === 'queued'}
-                >
-                  <Database size={15} /> {parseState === 'requesting' ? 'Requesting…' : parseState === 'queued' ? 'Queued' : 'Request replay parse'}
-                </button>
+              {!noReplaySource && (
+                !hasOpenDotaKey() ? (
+                  <button type="button" className="btn btn-primary" onClick={requestParse}>
+                    <KeyRound size={15} /> Add API key
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={requestParse}
+                    disabled={parseState === 'requesting' || parseState === 'queued'}
+                  >
+                    <Database size={15} /> {parseState === 'requesting' ? 'Requesting…' : parseState === 'queued' ? 'Queued' : 'Request replay parse'}
+                  </button>
+                )
               )}
               <button
                 type="button"
@@ -338,6 +353,9 @@ export function MatchDetailPage() {
               >
                 Refresh match
               </button>
+              {noReplaySource && (
+                <Link className="btn btn-ghost" to="/parser">Open Parser lab</Link>
+              )}
             </div>
           </div>
         </section>

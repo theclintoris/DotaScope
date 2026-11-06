@@ -69,6 +69,9 @@ windows/portable-full/
 # Windows shortcuts
 *.lnk
 
+# Local Android build home
+/.gradle-home/
+
 # Cloudflare / Wrangler local state
 .wrangler/
 cloudflare/.wrangler/

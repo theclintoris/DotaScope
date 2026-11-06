@@ -7,6 +7,12 @@ All notable changes to DotaScope are recorded here. The public release lives at
 
 ### Added
 
+- **Automatic replay retry queue** — when a post-game replay URL is not
+  available immediately, DotaScope now remembers the match and retries
+  automatic parsing with backoff for up to 24 hours. The queue survives app
+  restarts; the toast explains that it is waiting for a replay source. Matches
+  whose replay DotaScope cannot obtain still need a manual replay download in
+  Dota 2, which the replay-folder watcher parses automatically.
 - **Full portable Windows build** — `DotaScope-1.0.0-portable-full.zip`
   bundles the app, worker, Node 26, a minimal Java 21 runtime, 7-Zip, the
   OpenDota parser JAR and the GSI config. `Setup.cmd` installs the GSI config
