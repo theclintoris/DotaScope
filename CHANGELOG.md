@@ -7,6 +7,14 @@ All notable changes to DotaScope are recorded here. The public release lives at
 
 ### Added
 
+- **Community parse archive (opt-in)** — completed parsed Ranked and Turbo
+  matches can be uploaded to a Cloudflare Workers + D1 archive, and another
+  installation can open the same match without the local replay. Player names
+  and Steam IDs are stripped before upload; `.dem` files, API keys and Steam
+  credentials are never shared. Uploads are deduplicated by match ID and capped
+  at 20 per hour per hashed IP. Enable it in **Parser lab → Community archive**;
+  the setting is off by default. Shared matches fall back automatically when
+  the local worker has no parse, and the match page labels the source.
 - **Immortal lens** — a fourth population driven by Spectral's weekly
   `imm_ranked_meta_last_7` report. Immortal hero pick/win rates and
   hero-vs-hero matchup edges are available across the global lens, Draft lab

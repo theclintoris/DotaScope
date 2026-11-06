@@ -836,6 +836,12 @@ pre {
   color: #7fe0b0;
 }
 
+.badge-shared {
+  border-color: rgba(238, 169, 79, 0.34);
+  background: rgba(238, 169, 79, 0.1);
+  color: var(--accent);
+}
+
 .text-link {
   display: inline-flex;
   align-items: center;

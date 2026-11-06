@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
+  Cloud,
   Cpu,
   Download,
   ExternalLink,
@@ -13,12 +14,14 @@ import {
   Play,
   RefreshCw,
   Server,
+  ShieldCheck,
   Terminal,
 } from 'lucide-react'
 import { useMeta } from '../context/MetaContext'
 import { useProfile } from '../context/ProfileContext'
 import { useDocumentTitle } from '../lib/hooks'
-import { formatDuration, formatNumber, timeAgoFromIso } from '../lib/format'
+import { classNames, formatDuration, formatNumber, timeAgoFromIso } from '../lib/format'
+import { fetchSharedArchiveHealth, isSharedUploadEnabled, setSharedUploadEnabled } from '../lib/sharedArchive'
 import { HeroPortrait, PageHeader, SectionHeading } from '../components/ui'
 
 interface WorkerHealth {
@@ -144,6 +147,29 @@ export function ParserLabPage() {
   const [backfill, setBackfill] = useState<BackfillState | null>(null)
   const [backfillError, setBackfillError] = useState<string | null>(null)
   const [loadingIds, setLoadingIds] = useState(false)
+  const [sharingEnabled, setSharingEnabled] = useState(isSharedUploadEnabled())
+  const [sharedHealth, setSharedHealth] = useState<{ matches: number } | null>(null)
+
+  useEffect(() => {
+    let active = true
+    setSharingEnabled(isSharedUploadEnabled())
+    fetchSharedArchiveHealth()
+      .then((health) => {
+        if (active) setSharedHealth(health)
+      })
+      .catch(() => {
+        if (active) setSharedHealth(null)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const toggleSharing = () => {
+    const next = !sharingEnabled
+    setSharedUploadEnabled(next)
+    setSharingEnabled(next)
+  }
 
   const load = async () => {
     setLoading(true)
@@ -309,6 +335,40 @@ export function ParserLabPage() {
           <Server size={17} />
           <span>Runs on this PC only</span>
           <small>Web and Android can connect when the worker is reachable.</small>
+        </div>
+      </section>
+
+      <section className="panel parser-share">
+        <div className="parser-share-icon"><Cloud size={22} /></div>
+        <div className="parser-share-copy">
+          <p className="eyebrow">Community archive</p>
+          <h2>Share parsed matches</h2>
+          <p>
+            Opt in to upload completed Ranked and Turbo parses after they finish. Other players can
+            then load the same scoreboard, timeline and ward map without needing the replay.
+          </p>
+          <p className="muted-copy">
+            Player names and Steam IDs are stripped before upload. The shared payload contains the
+            match, anonymised player rows, timeline and ward positions — never your replay file or API key.
+          </p>
+        </div>
+        <div className="parser-share-control">
+          <span className="parser-share-status">
+            <ShieldCheck size={13} /> {sharingEnabled ? 'Sharing enabled' : 'Sharing off'}
+          </span>
+          <button
+            className={classNames('parser-share-toggle', sharingEnabled && 'is-on')}
+            type="button"
+            aria-pressed={sharingEnabled}
+            onClick={toggleSharing}
+          >
+            {sharingEnabled ? 'On' : 'Off'}
+          </button>
+          <small>
+            {sharedHealth
+              ? `${formatNumber(sharedHealth.matches)} shared match${sharedHealth.matches === 1 ? '' : 'es'}`
+              : 'Community archive unreachable'}
+          </small>
         </div>
       </section>
 

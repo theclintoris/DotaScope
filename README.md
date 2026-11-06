@@ -48,6 +48,19 @@ DotaScope reads the local game through Valve's official **Game State Integration
 
 The bridge listens only on `127.0.0.1:53000`. It never reads game memory or touches game files beyond loading the user-installed GSI config.
 
+## Community parse archive (opt-in)
+
+DotaScope can share a **parsed match result** with other DotaScope installs through the community archive at `https://dotascope-shared.dotascope.workers.dev`. This is an opt-in convenience for extending parsed Ranked/Turbo coverage without asking every player to download the same replay.
+
+- Enable **Parser lab → Community archive → Share parsed matches**. The setting is off by default and is stored in this browser/device.
+- When an automatic parse finishes, DotaScope uploads the same anonymised stats it already displays: match metadata, ten player rows, the per-minute timeline and ward positions. It **does not** upload `.dem` files, replay files, Steam credentials, OpenDota API keys or account passwords.
+- Player display names and Steam IDs are removed before upload; the archive keeps the Dota account ID, hero, slot and performance numbers needed to render the match.
+- Opening a match that is not available locally automatically falls back to the shared archive. The match page labels the source **Shared archive**; Ward map, timeline and scoreboard render exactly as they do for a local parse.
+- Uploads are deduplicated by match ID. The Worker rejects malformed/non-Ranked-or-Turbo payloads, caps uploads at 20 per hour per hashed IP, and stores at most 1.5 MB per match.
+- There is no account/login for the archive and no public index of players; a match is fetched by its match ID.
+
+The Worker, D1 schema and deployment steps live in [`cloudflare/README.md`](cloudflare/README.md). The current deployment uses Cloudflare Workers + D1 in the `dotascope-shared` Worker.
+
 ## Local replay parser and automatic parsing
 
 The **Parser lab** runs the OpenDota parser locally so Ranked standard and Turbo games plus utility data that the public match feed omits can still be inspected. It is separate from the packaged WebView2 frontend and needs a one-time local worker setup.
@@ -244,6 +257,7 @@ windows/
   Launcher.cs           portable launcher that embeds and starts the host
   icon.ico
 android/        Capacitor 8 Android project (Gradle, signing config)
+cloudflare/     Workers + D1 shared parsed-match archive
 assets/         Android adaptive icon + splash source art
 scripts/
   build-windows.ps1     package dist + publish the Windows host + launcher

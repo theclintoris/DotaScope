@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, CheckCircle2, Loader2, X } from 'lucide-react'
 import { fetchGsiLatest, isNativeGsiHost } from '../lib/gsi'
+import { isSharedUploadEnabled, uploadSharedMatch } from '../lib/sharedArchive'
+import type { LocalParsedMatch } from '../lib/localMatchStats'
 import { classNames } from '../lib/format'
 
 type ToastKind = 'working' | 'success' | 'info' | 'error'
@@ -71,6 +73,9 @@ export function AutoParserWatcher() {
         if (data?.skipped) {
           showToast({ kind: 'info', message: 'That match was not Ranked or Turbo, so it was left alone.' })
         } else {
+          if (data && isSharedUploadEnabled()) {
+            void uploadSharedMatch(data as unknown as LocalParsedMatch)
+          }
           showToast({
             kind: 'success',
             message: `Replay parsed${data?.match?.gameModeName ? ` · ${data.match.gameModeName}` : ''}. Open Parser lab for the full line-up.`,

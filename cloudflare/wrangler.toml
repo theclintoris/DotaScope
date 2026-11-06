@@ -1,0 +1,12 @@
+name = "dotascope-shared"
+main = "worker.js"
+workers_dev = true
+compatibility_date = "2025-04-01"
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dotascope-shared"
+database_id = "8e1ccbea-cf72-46c0-9267-06360ca64950"

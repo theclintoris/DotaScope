@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { MatchDetail, MatchPlayer } from '../types'
+import { fetchSharedMatch } from './sharedArchive'
 
 const LOCAL_ORIGIN = 'http://127.0.0.1:5601'
+
+export type LocalMatchSource = 'local' | 'shared' | null
 
 export interface LocalParsedPlayer {
   playerSlot: number
@@ -74,6 +77,8 @@ export interface LocalMatchState {
   data: LocalParsedMatch | null
   loading: boolean
   available: boolean
+  source: LocalMatchSource
+  sharedAt: number | null
   refresh: () => void
 }
 
@@ -164,7 +169,7 @@ export function useLocalMatchStats(matchId: string | undefined): LocalMatchState
   const [data, setData] = useState<LocalParsedMatch | null>(null)
   const [loading, setLoading] = useState(false)
   const [nonce, setNonce] = useState(0)
-  const numericId = matchId && /^\d+$/.test(matchId) ? matchId : null
+  const numericId = matchId && /^[0-9]+$/.test(matchId) ? matchId : null
 
   useEffect(() => {
     if (!numericId) {
@@ -204,7 +209,91 @@ export function useLocalMatchStats(matchId: string | undefined): LocalMatchState
   const refresh = useCallback(() => setNonce((value) => value + 1), [])
 
   return useMemo(
-    () => ({ data, loading, available: Boolean(data?.players?.length), refresh }),
+    () => ({
+      data,
+      loading,
+      available: Boolean(data?.players?.length),
+      source: data ? 'local' : null,
+      sharedAt: null,
+      refresh,
+    }),
     [data, loading, refresh],
+  )
+}
+
+export function useArchiveMatchStats(matchId: string | undefined): LocalMatchState {
+  const [data, setData] = useState<LocalParsedMatch | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [source, setSource] = useState<LocalMatchSource>(null)
+  const [sharedAt, setSharedAt] = useState<number | null>(null)
+  const [nonce, setNonce] = useState(0)
+  const numericId = matchId && /^[0-9]+$/.test(matchId) ? matchId : null
+
+  useEffect(() => {
+    if (!numericId) {
+      setData(null)
+      setSource(null)
+      setSharedAt(null)
+      setLoading(false)
+      return
+    }
+
+    let active = true
+    setLoading(true)
+    setSource(null)
+    setSharedAt(null)
+
+    const load = async () => {
+      let local: LocalParsedMatch | null = null
+      const controller = new AbortController()
+      const timeout = window.setTimeout(() => controller.abort(), 2500)
+      try {
+        const response = await fetch(`${LOCAL_ORIGIN}/stats/${numericId}`, { signal: controller.signal })
+        if (response.ok) {
+          const payload = (await response.json()) as LocalParsedMatch
+          if (payload?.players?.length) local = payload
+        }
+      } catch {
+        // No local worker or timeout: fall through to the community archive.
+      } finally {
+        window.clearTimeout(timeout)
+        controller.abort()
+      }
+
+      if (!active) return
+      if (local) {
+        setData(local)
+        setSource('local')
+        setSharedAt(null)
+        setLoading(false)
+        return
+      }
+
+      const shared = await fetchSharedMatch(numericId)
+      if (!active) return
+      if (shared) {
+        setData(shared.stats)
+        setSource('shared')
+        setSharedAt(shared.sharedAt)
+      } else {
+        setData(null)
+        setSource(null)
+        setSharedAt(null)
+      }
+      setLoading(false)
+    }
+
+    void load()
+
+    return () => {
+      active = false
+    }
+  }, [numericId, nonce])
+
+  const refresh = useCallback(() => setNonce((value) => value + 1), [])
+
+  return useMemo(
+    () => ({ data, loading, available: Boolean(data?.players?.length), source, sharedAt, refresh }),
+    [data, loading, source, sharedAt, refresh],
   )
 }

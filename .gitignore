@@ -65,3 +65,8 @@ windows/DotaScope-app.exe
 
 # Windows shortcuts
 *.lnk
+
+# Cloudflare / Wrangler local state
+.wrangler/
+cloudflare/.wrangler/
+.dev.vars

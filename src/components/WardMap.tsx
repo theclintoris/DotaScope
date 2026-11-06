@@ -11,6 +11,7 @@ interface WardMapProps {
   radiantName: string
   direName: string
   duration: number
+  source?: 'local' | 'shared'
 }
 
 type KindFilter = 'all' | 'observer' | 'sentry'
@@ -31,6 +32,7 @@ export function WardMap({
   radiantName,
   direName,
   duration,
+  source = 'local',
 }: WardMapProps) {
   const [kind, setKind] = useState<KindFilter>('all')
   const [team, setTeam] = useState<TeamFilter>('all')
@@ -56,11 +58,11 @@ export function WardMap({
     <section className="panel ward-map-panel">
       <div className="panel-head ward-map-head">
         <div>
-          <span className="eyebrow">Local replay intelligence</span>
+          <span className="eyebrow">{source === 'shared' ? 'Shared replay intelligence' : 'Local replay intelligence'}</span>
           <h2>Ward map</h2>
           <p>Hover or tap a marker for the placement time and hero.</p>
         </div>
-        <span className="badge badge-local">
+        <span className={classNames('badge', source === 'shared' ? 'badge-shared' : 'badge-local')}>
           <Eye size={12} /> {wards.length} wards
         </span>
       </div>
@@ -153,7 +155,7 @@ export function WardMap({
         <span><i className="ward-legend-ring is-radiant" /> Radiant</span>
         <span><i className="ward-legend-ring is-dire" /> Dire</span>
         <span className="ward-map-source">
-          <DatabaseIcon /> Positions from the local parser; hover timestamps are match time.
+          <DatabaseIcon /> Positions from the {source === 'shared' ? 'shared archive' : 'local parser'}; hover timestamps are match time.
         </span>
       </div>
     </section>

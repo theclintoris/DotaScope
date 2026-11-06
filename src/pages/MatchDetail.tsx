@@ -29,7 +29,7 @@ import type {
 } from '../types'
 import { useMeta } from '../context/MetaContext'
 import { requestMatchParse, TTL } from '../lib/api'
-import { mergeLocalMatch, useLocalMatchStats } from '../lib/localMatchStats'
+import { mergeLocalMatch, useArchiveMatchStats } from '../lib/localMatchStats'
 import { WardMap } from '../components/WardMap'
 import { useDocumentTitle, useRemote } from '../lib/hooks'
 import { hasOpenDotaKey } from '../lib/settings'
@@ -62,7 +62,7 @@ export function MatchDetailPage() {
   const { matchId } = useParams()
   const meta = useMeta()
   const detail = useRemote<MatchDetail>(matchId ? `/matches/${matchId}` : null, TTL.detail)
-  const localStats = useLocalMatchStats(matchId)
+  const localStats = useArchiveMatchStats(matchId)
   const items = useRemote<ItemConstants>('/constants/items', TTL.constants)
   const [chartMode, setChartMode] = useState<'gold' | 'xp'>('gold')
   const [parseState, setParseState] = useState<'idle' | 'requesting' | 'queued' | 'error'>('idle')
@@ -73,6 +73,8 @@ export function MatchDetailPage() {
     [remoteMatch, localStats.data],
   )
   const localParsed = Boolean(localStats.data?.players?.length)
+  const sharedParsed = localStats.source === 'shared'
+  const parsedSourceLabel = sharedParsed ? 'Shared archive' : 'Parsed locally'
   const remoteParsed = Boolean(remoteMatch?.od_data?.has_parsed)
   const parsed = remoteParsed || localParsed
   useDocumentTitle(match ? `Match #${match.match_id}` : 'Match')
@@ -154,7 +156,11 @@ export function MatchDetailPage() {
             <span className="badge badge-muted">{gameModeName(match.game_mode)}</span>
             <span className="badge badge-muted">{lobbyName(match.lobby_type)}</span>
             {match.patch != null && <span className="badge badge-muted">Patch {match.patch}</span>}
-            {localParsed && <span className="badge badge-local">Parsed locally</span>}
+            {localParsed && (
+              <span className={classNames('badge', sharedParsed ? 'badge-shared' : 'badge-local')}>
+                {parsedSourceLabel}
+              </span>
+            )}
           </div>
           <span className="muted-label">
             <CalendarDays size={13} /> {formatUnixTime(match.start_time)} · {timeAgo(match.start_time)}
@@ -245,31 +251,42 @@ export function MatchDetailPage() {
         )}
         <p className="panel-footnote">
           Positive values favour Radiant; negative values favour Dire.{' '}
-          {localParsed && !remoteParsed ? 'Advantage timeline from the local replay parser.' : 'Parsed match data from OpenDota.'}
+          {localParsed && !remoteParsed
+            ? sharedParsed
+              ? 'Advantage timeline from the shared community archive.'
+              : 'Advantage timeline from the local replay parser.'
+            : 'Parsed match data from OpenDota.'}
         </p>
       </section>
 
       {localParsed && !remoteParsed && (
-        <section className="panel parse-panel local-parse-panel">
+        <section className={classNames('panel parse-panel', sharedParsed ? 'shared-parse-panel' : 'local-parse-panel')}>
           <SectionHeading
             eyebrow="Replay intelligence"
-            title="Parsed locally"
-            hint="Local parser data is merged with OpenDota's basic match data"
-            action={<span className="badge badge-local">Local parser</span>}
+            title={sharedParsed ? 'Shared archive parse' : 'Parsed locally'}
+            hint={sharedParsed
+              ? 'Community-shared parse data; no local replay required'
+              : "Local parser data is merged with OpenDota's basic match data"}
+            action={<span className={classNames('badge', sharedParsed ? 'badge-shared' : 'badge-local')}>{sharedParsed ? 'Shared archive' : 'Local parser'}</span>}
           />
           <div className="parse-panel-body">
             <div>
               <p className="muted-copy">
-                DotaScope parsed this replay on this PC. No paid OpenDota API key is required.
-                The scoreboard and vision data below use the local parse; OpenDota still supplies player identities and items.
+                {sharedParsed
+                  ? 'DotaScope loaded this parse from the shared community archive. No local replay is required; player display names and Steam IDs are stripped before upload.'
+                  : 'DotaScope parsed this replay on this PC. No paid OpenDota API key is required. The scoreboard and vision data below use the local parse; OpenDota still supplies player identities and items.'}
               </p>
               <p className="muted-label">
-                {localStats.loading ? 'Refreshing local stats…' : 'Local worker data is available for this match.'}
+                {localStats.loading
+                  ? sharedParsed ? 'Refreshing shared parse…' : 'Refreshing local stats…'
+                  : sharedParsed
+                    ? 'Shared parse data is available for this match.'
+                    : 'Local worker data is available for this match.'}
               </p>
             </div>
             <div className="parse-panel-actions">
               <button type="button" className="btn btn-ghost" onClick={() => { localStats.refresh(); detail.refresh() }}>
-                Refresh local parse
+                {sharedParsed ? 'Refresh shared parse' : 'Refresh local parse'}
               </button>
               <Link className="btn btn-ghost" to="/parser">Open Parser lab</Link>
             </div>
@@ -328,7 +345,7 @@ export function MatchDetailPage() {
           hint="Click a player name to open their profile"
           action={
             <span className="muted-label">
-              <Database size={13} /> {localParsed ? 'Parsed locally' : remoteParsed ? 'Parsed match' : 'Basic match data'}
+              <Database size={13} /> {localParsed ? parsedSourceLabel : remoteParsed ? 'Parsed match' : 'Basic match data'}
             </span>
           }
         />
@@ -364,6 +381,7 @@ export function MatchDetailPage() {
       {localParsed && localStats.data?.wards?.length ? (
         <WardMap
           wards={localStats.data.wards}
+          source={sharedParsed ? 'shared' : 'local'}
           players={match.players}
           heroes={heroes}
           radiantName={radiantName}

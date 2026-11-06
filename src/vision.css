@@ -33,6 +33,17 @@
   align-items: flex-start;
 }
 
+.shared-parse-panel {
+  border-color: rgba(238, 169, 79, 0.24);
+  background:
+    linear-gradient(120deg, rgba(238, 169, 79, 0.06), transparent 55%),
+    var(--panel);
+}
+
+.shared-parse-panel .parse-panel-body {
+  align-items: flex-start;
+}
+
 .vision-summary {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
