@@ -48,6 +48,7 @@ internal static class Program
         Log($"startup exe={Application.ExecutablePath} local={Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)}");
 
         TryPrepareWebView2Loader(dataRoot);
+        GsiSetup.Ensure();
         GsiBridge.Start();
 
         string webRoot;

@@ -7,6 +7,12 @@ All notable changes to DotaScope are recorded here. The public release lives at
 
 ### Added
 
+- **Full portable Windows build** — `DotaScope-1.0.0-portable-full.zip`
+  bundles the app, worker, Node 26, a minimal Java 21 runtime, 7-Zip, the
+  OpenDota parser JAR and the GSI config. `Setup.cmd` installs the GSI config
+  and adds `-gamestateintegration` to Dota 2's Steam launch options, so Parser
+  lab and automatic Ranked/Turbo parsing work on a clean PC without developer
+  tools. The normal single-file EXE remains available for lightweight use.
 - **Community parse archive (opt-in)** — completed parsed Ranked and Turbo
   matches can be uploaded to a Cloudflare Workers + D1 archive, and another
   installation can open the same match without the local replay. Player names

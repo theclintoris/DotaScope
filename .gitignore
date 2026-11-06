@@ -39,8 +39,11 @@ windows/DotaScope-app.exe
 /data/
 
 # Packaging scratch
+.tmp/
 .tmp-*
 *.7z
+windows/portable-test/
+windows/portable-full/
 
 # Editor directories and files
 .vscode/*

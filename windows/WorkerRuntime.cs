@@ -43,6 +43,7 @@ internal static class WorkerRuntime
 
         try
         {
+            string portableRoot = PortableRoot();
             var start = new ProcessStartInfo
             {
                 FileName = node,
@@ -53,6 +54,8 @@ internal static class WorkerRuntime
                 RedirectStandardError = true,
             };
             start.ArgumentList.Add(script);
+            start.Environment["PARSER_DATA_DIR"] = Path.Combine(dataRoot, "worker-data");
+            SetRuntimeEnvironment(start, portableRoot);
 
             var worker = new Process { StartInfo = start };
             worker.OutputDataReceived += (_, args) => AppendWorkerLog(dataRoot, args.Data);
@@ -138,6 +141,12 @@ internal static class WorkerRuntime
             return configured;
         }
 
+        string bundled = Path.Combine(PortableRoot(), "runtime", "node", "node.exe");
+        if (File.Exists(bundled))
+        {
+            return bundled;
+        }
+
         var candidates = new List<string>
         {
             @"C:\Program Files\nodejs\node.exe",
@@ -156,6 +165,30 @@ internal static class WorkerRuntime
         }
 
         return candidates.FirstOrDefault(File.Exists);
+    }
+
+    private static string PortableRoot()
+    {
+        string? launchDir = Environment.GetEnvironmentVariable("DOTASCOPE_LAUNCH_DIR");
+        return string.IsNullOrWhiteSpace(launchDir)
+            ? AppContext.BaseDirectory
+            : Path.GetFullPath(launchDir);
+    }
+
+    private static void SetRuntimeEnvironment(ProcessStartInfo start, string portableRoot)
+    {
+        string runtime = Path.Combine(portableRoot, "runtime");
+        SetIfExists(start, "JAVA_BIN", Path.Combine(runtime, "jre", "bin", "java.exe"));
+        SetIfExists(start, "SEVEN_ZIP_BIN", Path.Combine(runtime, "7z", "7z.exe"));
+        SetIfExists(start, "OPENDOTA_PARSER_JAR", Path.Combine(runtime, "parser", "stats-0.1.0.jar"));
+    }
+
+    private static void SetIfExists(ProcessStartInfo start, string name, string path)
+    {
+        if (File.Exists(path))
+        {
+            start.Environment[name] = path;
+        }
     }
 
     private static string? FindWorkerScript()

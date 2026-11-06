@@ -118,14 +118,17 @@ The native builds are bundled in this project:
 | File | What it is |
 | --- | --- |
 | `DotaScope-1.0.0.apk` | Signed release APK for Android 7.0+ (minSdk 24, targetSdk 36) |
-| `DotaScope-1.0.0-win-x64.exe` | Portable Windows x64 app (about 64 MB). No installer or environment setup. |
+| `DotaScope-1.0.0-win-x64.exe` | Portable Windows x64 app (about 64 MB) for PCs that already have Node, Java and 7-Zip or only need the web app. |
+| `DotaScope-1.0.0-portable-full.zip` | **Recommended for most Windows users.** Self-contained folder with the app, Node 26, Java 21, 7-Zip, parser JAR and GSI config; one-click setup. About 270 MB unpacked. |
 | `DotaScope-1.0.0.zip` | Static web build for the PWA / browser fallback. |
 
-**Windows:** run `DotaScope-1.0.0-win-x64.exe`. Windows SmartScreen may warn because the build is not Authenticode-signed; choose **More info → Run anyway**. The app needs the **Microsoft Edge WebView2 Runtime** (already present on current Windows 10/11 systems) and .NET Framework 4.8 (included with Windows 10/11). There is no installer and no Electron runtime.
+**Windows (recommended):** download `DotaScope-1.0.0-portable-full.zip`, extract the whole folder, and run `Setup.cmd` once. Setup installs the Dota GSI config and adds `-gamestateintegration` to Dota 2's Steam launch options (close Steam when prompted). Then run `DotaScope-1.0.0-win-x64.exe`. The folder already contains Node 26, a minimal Java 21 runtime, 7-Zip, the OpenDota parser JAR, the worker and the GSI config, so Parser lab and automatic parsing work without installing developer tools. Keep the folder together; this build keeps its history in the `data` folder beside the EXE, so preserve `data` when updating the portable folder.
+
+**Windows (minimal EXE):** `DotaScope-1.0.0-win-x64.exe` runs the web app and Steam/profile features by itself, but Parser lab and auto-parse stay offline unless `worker/parser-worker.mjs`, Node, Java and 7-Zip are provided. Use the full portable ZIP for the complete feature set. Windows SmartScreen may warn because the build is not Authenticode-signed; choose **More info → Run anyway**. The app needs the **Microsoft Edge WebView2 Runtime** (already present on current Windows 10/11 systems) and .NET Framework 4.8 (included with Windows 10/11). There is no installer and no Electron runtime.
 
 The EXE is a portable launcher with the full WebView2 app embedded inside. It chooses a writable data directory (`%LOCALAPPDATA%\DotaScope`, then `%APPDATA%\DotaScope`, then a `data` folder beside the EXE), sets its own extraction paths, and starts the host. You do **not** need to set `DOTNET_BUNDLE_EXTRACT_BASE_DIR` manually. Launching from the installed Steam shortcut uses the same launcher and picks up the active Steam account.
 
-The launcher also starts the local parser worker when `worker/parser-worker.mjs` is available beside it and stops that worker when DotaScope exits. The standalone single-file EXE does not embed Node, Java, 7-Zip, the parser jar or the worker sources; without the local worker checkout the app still runs, but Parser lab stays offline.
+The launcher also starts the local parser worker when `worker/parser-worker.mjs` is available beside it and stops that worker when DotaScope exits. In the full portable build, the worker uses the bundled `runtime/node/node.exe`, `runtime/jre`, `runtime/7z/7z.exe` and `runtime/parser/stats-0.1.0.jar`; no system installs are needed. The standalone single-file EXE does not embed those runtime files, so without the full portable folder the app still runs but Parser lab stays offline.
 
 The Windows launcher is single-instance. If a DotaScope window is already open, launching the EXE or pressing **Play** in Steam focuses that window instead of opening a second WebView2 host against a locked profile. After installing an update, close the existing DotaScope window and launch again to load the new build. If Windows still reports a WebView2 state error, close all DotaScope/WebView2 processes and retry.
 
