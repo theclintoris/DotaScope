@@ -112,6 +112,92 @@ export async function fetchSharedMatch(matchId: string): Promise<SharedArchiveMa
   }
 }
 
+export interface SharedTurboRow {
+  match_id: number
+  account_id: number | null
+  player_slot: number
+  radiant_win: boolean
+  hero_id: number
+  start_time: number
+  duration: number
+  game_mode: number
+  lobby_type: number
+  kills: number
+  deaths: number
+  assists: number
+  gold_per_min: number
+  xp_per_min: number
+  last_hits: number
+  denies: number
+  hero_damage: number
+  tower_damage: number
+  hero_healing: number
+  obs_placed?: number
+  sen_placed?: number
+  camps_stacked?: number
+  rune_pickups?: number
+  source?: string
+}
+
+export async function fetchSharedTurboRows(
+  accountId: number,
+  limit = 20,
+): Promise<SharedTurboRow[]> {
+  try {
+    const response = await fetch(
+      `${SHARED_ARCHIVE_URL}/v1/players/${accountId}/turbo-rows?limit=${limit}`,
+      { cache: 'no-store', signal: AbortSignal.timeout(8_000) },
+    )
+    if (!response.ok) return []
+    const payload = (await response.json().catch(() => null)) as
+      | { ok?: boolean; matches?: SharedTurboRow[] }
+      | null
+    if (!payload?.ok || !Array.isArray(payload.matches)) return []
+    return payload.matches.filter(
+      (row) =>
+        Number.isFinite(row.match_id) &&
+        Number.isFinite(row.account_id) &&
+        Number(row.match_id) > 0 &&
+        Number(row.account_id) > 0,
+    )
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Pull the account's shared Turbo matches and merge them into the local
+ * worker's Turbo history. The local worker recalculates the Elo ledger and
+ * dedupes by match/account, so imports are idempotent.
+ */
+export async function syncSharedTurboHistory(
+  accountId: number,
+  limit = 20,
+): Promise<{ fetched: number; added: number }> {
+  const rows = await fetchSharedTurboRows(accountId, limit)
+  if (!rows.length) return { fetched: 0, added: 0 }
+  try {
+    const response = await fetch('http://127.0.0.1:5601/shared-history', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ rows }),
+      signal: AbortSignal.timeout(8_000),
+    })
+    if (!response.ok) return { fetched: rows.length, added: 0 }
+    const payload = (await response.json().catch(() => null)) as
+      | { ok?: boolean; added?: number }
+      | null
+    const added = Number(payload?.added ?? 0)
+    if (added > 0) {
+      window.dispatchEvent(new Event('dotascope:turbo-history'))
+      window.dispatchEvent(new Event('dotascope:turbo-elo'))
+    }
+    return { fetched: rows.length, added: Number.isFinite(added) ? added : 0 }
+  } catch {
+    return { fetched: rows.length, added: 0 }
+  }
+}
+
 export async function fetchSharedArchiveHealth(): Promise<SharedArchiveHealth | null> {
   try {
     const response = await fetch(`${SHARED_ARCHIVE_URL}/health`, {

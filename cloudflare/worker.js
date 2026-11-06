@@ -299,6 +299,62 @@ export default {
         ).bind(limit).all()
         return json({ ok: true, matches: rows.results ?? [] })
       }
+      const playerRows = url.pathname.match(/^\/v1\/players\/(\d{1,20})\/turbo-rows$/)
+      if (playerRows && request.method === 'GET') {
+        const accountId = Number(playerRows[1])
+        if (!Number.isFinite(accountId) || accountId <= 0) return error('Invalid account ID.')
+        const limit = Math.max(1, Math.min(50, Number(url.searchParams.get('limit') ?? 20) || 20))
+        const rows = await env.DB.prepare(
+          `SELECT m.match_id, m.start_time, m.duration, m.game_mode, m.radiant_win,
+                  p.account_id, p.player_slot, p.hero_id, p.team, p.won,
+                  p.kills, p.deaths, p.assists, p.gold_per_min, p.xp_per_min,
+                  p.last_hits, p.denies, p.hero_damage, p.tower_damage, p.hero_healing,
+                  p.obs_placed, p.sen_placed, p.camps_stacked, p.rune_pickups
+           FROM (
+             SELECT p2.match_id
+             FROM players p2
+             JOIN matches m2 ON m2.match_id = p2.match_id
+             WHERE p2.account_id = ? AND m2.game_mode = 23
+             GROUP BY p2.match_id
+             ORDER BY MAX(m2.start_time) DESC
+             LIMIT ?
+           ) recent
+           JOIN matches m ON m.match_id = recent.match_id
+           JOIN players p ON p.match_id = m.match_id
+           ORDER BY m.start_time DESC, p.player_slot ASC`,
+        ).bind(accountId, limit).all()
+        const matches = (rows.results ?? []).map((row) => {
+          const storedSlot = Number(row.player_slot)
+          const playerSlot = row.team === 'dire' ? storedSlot + 123 : storedSlot
+          return {
+          match_id: Number(row.match_id),
+          account_id: row.account_id == null ? null : Number(row.account_id),
+          player_slot: playerSlot,
+          radiant_win: Boolean(row.radiant_win),
+          hero_id: Number(row.hero_id),
+          start_time: Number(row.start_time),
+          duration: Number(row.duration),
+          game_mode: Number(row.game_mode),
+          lobby_type: 0,
+          kills: Number(row.kills),
+          deaths: Number(row.deaths),
+          assists: Number(row.assists),
+          gold_per_min: Number(row.gold_per_min),
+          xp_per_min: Number(row.xp_per_min),
+          last_hits: Number(row.last_hits),
+          denies: Number(row.denies),
+          hero_damage: Number(row.hero_damage),
+          tower_damage: Number(row.tower_damage),
+          hero_healing: Number(row.hero_healing),
+          obs_placed: Number(row.obs_placed),
+          sen_placed: Number(row.sen_placed),
+          camps_stacked: Number(row.camps_stacked),
+          rune_pickups: Number(row.rune_pickups),
+          source: 'shared-archive',
+          }
+        })
+        return json({ ok: true, accountId, count: matches.length, matches })
+      }
       const match = url.pathname.match(/^\/v1\/matches\/(\d{1,20})$/)
       if (match && request.method === 'GET') {
         const row = await env.DB.prepare('SELECT payload, created_at FROM matches WHERE match_id = ?')

@@ -57,6 +57,7 @@ DotaScope can share a **parsed match result** with other DotaScope installs thro
 - Player display names and Steam IDs are removed before upload; the archive keeps the Dota account ID, hero, slot and performance numbers needed to render the match.
 - Opening a match that is not available locally automatically falls back to the shared archive. The match page labels the source **Shared archive**; Ward map, timeline and scoreboard render exactly as they do for a local parse.
 - Uploads are deduplicated by match ID. The Worker rejects malformed/non-Ranked-or-Turbo payloads, caps uploads at 20 per hour per hashed IP, and stores at most 1.5 MB per match.
+- On the native desktop app, the pinned profile also imports recent shared Turbo rows for that account at launch. Imported rows fill gaps only, are stored locally as `shared-archive`, and rebuild the Turbo Elo ladder/benchmarks without overwriting local parses.
 - There is no account/login for the archive and no public index of players; a match is fetched by its match ID.
 
 The Worker, D1 schema and deployment steps live in [`cloudflare/README.md`](cloudflare/README.md). The current deployment uses Cloudflare Workers + D1 in the `dotascope-shared` Worker.

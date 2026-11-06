@@ -36,6 +36,13 @@ const ELO_URL = 'http://127.0.0.1:5601/turbo-elo'
 export function useTurboElo(accountId: number | null) {
   const [data, setData] = useState<TurboEloData | null>(null)
   const [loading, setLoading] = useState(false)
+  const [syncVersion, setSyncVersion] = useState(0)
+
+  useEffect(() => {
+    const reload = () => setSyncVersion((value) => value + 1)
+    window.addEventListener('dotascope:turbo-elo', reload)
+    return () => window.removeEventListener('dotascope:turbo-elo', reload)
+  }, [])
 
   useEffect(() => {
     if (!accountId) {
@@ -66,7 +73,7 @@ export function useTurboElo(accountId: number | null) {
       window.clearTimeout(timeout)
       controller.abort()
     }
-  }, [accountId])
+  }, [accountId, syncVersion])
 
   return { data, loading }
 }

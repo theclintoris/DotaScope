@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Activity,
   BadgeCheck,
@@ -29,6 +29,8 @@ import { useMeta } from '../context/MetaContext'
 import { useProfile } from '../context/ProfileContext'
 import { useInstallPrompt, useInterval, useLockBodyScroll, useOnlineStatus } from '../lib/hooks'
 import { classNames, timeAgo } from '../lib/format'
+import { isNativeGsiHost } from '../lib/gsi'
+import { syncSharedTurboHistory } from '../lib/sharedArchive'
 import { Brand } from './Brand'
 import { MetaLens } from './MetaLens'
 import { CommandPalette } from './CommandPalette'
@@ -102,11 +104,18 @@ export function AppShell() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [apiKeyOpen, setApiKeyOpen] = useState(false)
   const [, setTick] = useState(0)
+  const syncedAccount = useRef<number | null>(null)
   const section = resolveSection(location.pathname)
   const moreActive = MORE_LINKS.some((link) => location.pathname.startsWith(link.to))
 
   useInterval(() => setTick((tick) => tick + 1), 60_000)
   useLockBodyScroll(moreOpen)
+
+  useEffect(() => {
+    if (!accountId || !isNativeGsiHost() || syncedAccount.current === accountId) return
+    syncedAccount.current = accountId
+    void syncSharedTurboHistory(accountId)
+  }, [accountId])
 
   useEffect(() => {
     setMoreOpen(false)

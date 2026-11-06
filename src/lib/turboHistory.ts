@@ -73,6 +73,13 @@ export function useTurboHistory(accountId: number | null): TurboHistoryState {
   const [rows, setRows] = useState<RecentMatch[]>([])
   const [loading, setLoading] = useState(Boolean(accountId))
   const [available, setAvailable] = useState(false)
+  const [syncVersion, setSyncVersion] = useState(0)
+
+  useEffect(() => {
+    const reload = () => setSyncVersion((value) => value + 1)
+    window.addEventListener('dotascope:turbo-history', reload)
+    return () => window.removeEventListener('dotascope:turbo-history', reload)
+  }, [])
 
   useEffect(() => {
     if (!accountId) {
@@ -112,7 +119,7 @@ export function useTurboHistory(accountId: number | null): TurboHistoryState {
       window.clearTimeout(timeout)
       controller.abort()
     }
-  }, [accountId])
+  }, [accountId, syncVersion])
 
   return { rows, loading, available, count: rows.length }
 }
@@ -151,6 +158,13 @@ export function useTurboPeerHistory(accountId: number | null): TurboPeerHistoryS
   const [rows, setRows] = useState<TurboHistoryRow[]>([])
   const [loading, setLoading] = useState(Boolean(accountId))
   const [available, setAvailable] = useState(false)
+  const [syncVersion, setSyncVersion] = useState(0)
+
+  useEffect(() => {
+    const reload = () => setSyncVersion((value) => value + 1)
+    window.addEventListener('dotascope:turbo-history', reload)
+    return () => window.removeEventListener('dotascope:turbo-history', reload)
+  }, [])
 
   useEffect(() => {
     if (!accountId) {
@@ -189,7 +203,7 @@ export function useTurboPeerHistory(accountId: number | null): TurboPeerHistoryS
       window.clearTimeout(timeout)
       controller.abort()
     }
-  }, [accountId])
+  }, [accountId, syncVersion])
 
   return { rows, loading, available }
 }

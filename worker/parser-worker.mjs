@@ -611,6 +611,73 @@ function recordParsedHistories(stats) {
   }
 }
 
+function importSharedTurboRows(input) {
+  if (!Array.isArray(input)) throw new Error('rows must be an array.')
+  const history = loadHistory(TURBO_HISTORY_PATH)
+  const byKey = new Map(history.map((row) => [`${row.match_id}:${row.account_id}`, row]))
+  let added = 0
+  let skipped = 0
+  let invalid = 0
+
+  for (const source of input.slice(0, 5000)) {
+    const matchId = Number(source?.match_id ?? source?.matchId)
+    const accountId = Number(source?.account_id ?? source?.accountId)
+    const gameMode = Number(source?.game_mode ?? source?.gameMode ?? 23)
+    const duration = Number(source?.duration ?? 0)
+    const startTime = Number(source?.start_time ?? source?.startTime ?? 0)
+    if (
+      !Number.isSafeInteger(matchId) || matchId <= 0 ||
+      !Number.isSafeInteger(accountId) || accountId <= 0 ||
+      gameMode !== 23 || duration < 60 || startTime <= 0
+    ) {
+      invalid += 1
+      continue
+    }
+    let playerSlot = Number(source?.player_slot ?? source?.playerSlot)
+    const team = source?.team
+    if (team === 'dire' && playerSlot >= 0 && playerSlot < 5) playerSlot += 123
+    if (!Number.isFinite(playerSlot) || playerSlot < 0 || playerSlot > 132) {
+      invalid += 1
+      continue
+    }
+    const key = `${matchId}:${accountId}`
+    if (byKey.has(key)) {
+      skipped += 1
+      continue
+    }
+    byKey.set(key, {
+      match_id: matchId,
+      account_id: accountId,
+      player_slot: playerSlot,
+      radiant_win: Boolean(source?.radiant_win ?? source?.radiantWin),
+      hero_id: asNumber(source?.hero_id ?? source?.heroId),
+      start_time: startTime,
+      duration,
+      game_mode: 23,
+      lobby_type: asNumber(source?.lobby_type ?? source?.lobbyType),
+      kills: asNumber(source?.kills),
+      deaths: asNumber(source?.deaths),
+      assists: asNumber(source?.assists),
+      gold_per_min: asNumber(source?.gold_per_min ?? source?.goldPerMin),
+      xp_per_min: asNumber(source?.xp_per_min ?? source?.xpPerMin),
+      last_hits: asNumber(source?.last_hits ?? source?.lastHits),
+      denies: asNumber(source?.denies),
+      hero_damage: asNumber(source?.hero_damage ?? source?.heroDamage),
+      tower_damage: asNumber(source?.tower_damage ?? source?.towerDamage),
+      hero_healing: asNumber(source?.hero_healing ?? source?.heroHealing),
+      personaname: null,
+      source: 'shared-archive',
+    })
+    added += 1
+  }
+
+  if (added > 0) {
+    saveHistory(TURBO_HISTORY_PATH, [...byKey.values()].sort((a, b) => b.start_time - a.start_time))
+    try { ensureTurboElo() } catch { /* history remains usable */ }
+  }
+  return { added, skipped, invalid, total: byKey.size }
+}
+
 function historyFor(path, accountId, limit) {
   const rows = loadHistory(path)
   const filtered = accountId
@@ -986,6 +1053,17 @@ const server = createServer(async (req, res) => {
       }
       void runBackfill(backfillJob)
       return json(res, 202, { backfill: backfillPayload(backfillJob) })
+    }
+
+    if (req.method === 'POST' && url.pathname === '/shared-history') {
+      let body = ''
+      for await (const chunk of req) {
+        body += chunk
+        if (body.length > 2_000_000) throw new Error('Request body too large')
+      }
+      const parsed = body ? JSON.parse(body) : {}
+      const rows = Array.isArray(parsed) ? parsed : parsed.rows
+      return json(res, 200, { ok: true, ...importSharedTurboRows(rows) })
     }
 
     if (req.method === 'POST' && url.pathname === '/parse') {

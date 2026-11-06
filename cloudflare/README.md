@@ -69,6 +69,7 @@ The Worker exposes:
 | `POST` | `/v1/matches` | upload `{ match: stats }` or a raw stats object |
 | `GET` | `/v1/matches/:matchId` | fetch `{ ok, sharedAt, payload }` |
 | `GET` | `/v1/recent?limit=N` | recent match summaries |
+| `GET` | `/v1/players/:accountId/turbo-rows?limit=N` | all ten player rows for recent shared Turbo matches containing that account |
 
 `POST /v1/matches` accepts only Ranked standard (`game_mode=22`) or Turbo
 (`game_mode=23`) matches with exactly ten players and a duration of at least
@@ -76,6 +77,12 @@ The Worker exposes:
 match ID, caps the body at 1.5 MB and limits anonymous uploads to 20/hour per
 hashed IP. Dota Dire player slots 128–132 are normalised to 5–9 before the
 duplicate-slot check.
+
+`GET /v1/players/:accountId/turbo-rows` is used by the native client to fill
+the local Turbo history for the pinned account. It returns the full ten-player
+rows from recent shared Turbo matches, with Dire slots converted back to Dota's
+128–132 form. The local worker deduplicates by `matchId:accountId`, never
+overwrites a local parse, and rebuilds the Elo ledger after importing.
 
 ## Test the deployment
 

@@ -15,6 +15,9 @@ All notable changes to DotaScope are recorded here. The public release lives at
   at 20 per hour per hashed IP. Enable it in **Parser lab → Community archive**;
   the setting is off by default. Shared matches fall back automatically when
   the local worker has no parse, and the match page labels the source.
+  The native app also imports recent shared Turbo rows for the pinned account
+  on launch; imported rows fill gaps only, are stored locally as
+  `shared-archive`, and rebuild the Turbo Elo ladder and benchmarks.
 - **Immortal lens** — a fourth population driven by Spectral's weekly
   `imm_ranked_meta_last_7` report. Immortal hero pick/win rates and
   hero-vs-hero matchup edges are available across the global lens, Draft lab
