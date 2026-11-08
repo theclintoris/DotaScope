@@ -21,12 +21,66 @@ namespace DotaScopeLauncher
         private const string ResourceName = "DotaScope.App";
         private const string InstanceMutexName = @"Local\DotaScope.SingleInstance";
         private const int SwRestore = 9;
+        private const int JobObjectExtendedLimitInformation = 9;
+        private const uint JobObjectLimitKillOnJobClose = 0x2000;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JobBasicLimitInformation
+        {
+            public long PerProcessUserTimeLimit;
+            public long PerJobUserTimeLimit;
+            public uint LimitFlags;
+            public UIntPtr MinimumWorkingSetSize;
+            public UIntPtr MaximumWorkingSetSize;
+            public uint ActiveProcessLimit;
+            public UIntPtr Affinity;
+            public uint PriorityClass;
+            public uint SchedulingClass;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JobIoCounters
+        {
+            public ulong ReadOperationCount;
+            public ulong WriteOperationCount;
+            public ulong OtherOperationCount;
+            public ulong ReadTransferCount;
+            public ulong WriteTransferCount;
+            public ulong OtherTransferCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct JobExtendedLimitInformation
+        {
+            public JobBasicLimitInformation BasicLimitInformation;
+            public JobIoCounters IoInfo;
+            public UIntPtr ProcessMemoryLimit;
+            public UIntPtr JobMemoryLimit;
+            public UIntPtr PeakProcessMemoryUsed;
+            public UIntPtr PeakJobMemoryUsed;
+        }
 
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr window);
 
         [DllImport("user32.dll")]
         private static extern bool ShowWindowAsync(IntPtr window, int command);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr CreateJobObject(IntPtr attributes, string name);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetInformationJobObject(
+            IntPtr job,
+            int informationClass,
+            ref JobExtendedLimitInformation information,
+            uint informationLength);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr handle);
 
         [STAThread]
         private static int Main(string[] args)
@@ -105,14 +159,46 @@ namespace DotaScopeLauncher
                         start.Arguments = JoinArguments(args);
                     }
 
+                    IntPtr job = IntPtr.Zero;
                     using (Process child = Process.Start(start))
                     {
                         if (child == null)
                         {
                             throw new InvalidOperationException("DotaScope did not start.");
                         }
-                        child.WaitForExit();
-                        return child.ExitCode;
+
+                        // Keep the child, WebView2, worker, and Java parser inside one
+                        // kill-on-close job so Steam Stop cannot orphan them.
+                        job = CreateJobObject(IntPtr.Zero, null);
+                        if (job != IntPtr.Zero)
+                        {
+                            JobExtendedLimitInformation limits = new JobExtendedLimitInformation();
+                            limits.BasicLimitInformation.LimitFlags = JobObjectLimitKillOnJobClose;
+                            if (!SetInformationJobObject(
+                                    job,
+                                    JobObjectExtendedLimitInformation,
+                                    ref limits,
+                                    (uint)Marshal.SizeOf(typeof(JobExtendedLimitInformation)))
+                                || !AssignProcessToJobObject(job, child.Handle))
+                            {
+                                Log(root, "launcher job setup failed: " + Marshal.GetLastWin32Error());
+                                CloseHandle(job);
+                                job = IntPtr.Zero;
+                            }
+                        }
+
+                        try
+                        {
+                            child.WaitForExit();
+                            return child.ExitCode;
+                        }
+                        finally
+                        {
+                            if (job != IntPtr.Zero)
+                            {
+                                CloseHandle(job);
+                            }
+                        }
                     }
                 }
             }

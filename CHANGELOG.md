@@ -125,6 +125,7 @@ All notable changes to DotaScope are recorded here. The public release lives at
 
 ### Fixed
 
+- The Windows launcher now places the host, WebView2, parser worker and Java process in a kill-on-close job object. Stopping DotaScope from Steam — or terminating the launcher — now removes the whole process tree and clears Steam's running state instead of leaving an orphaned worker behind.
 - The local Java parser now uses a writable temp directory under `worker/data/java-tmp`, avoiding Windows temp-directory permission failures when loading Snappy or unpacking the replay. Ranked standard replays and Turbo replays share the same local parsing path.
 - The Windows launcher is now single-instance. Launching DotaScope again — including
   from the Steam shortcut — focuses the running window instead of starting a second
