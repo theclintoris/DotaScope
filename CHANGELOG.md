@@ -110,6 +110,9 @@ All notable changes to DotaScope are recorded here. The public release lives at
 
 ### Changed
 
+- The Matches explorer now opens on **My matches** by default, so the pinned
+  player's Ranked/Turbo history is the first thing shown. Pro scene and Public
+  queue remain one click away.
 - Meta escape's item cards now attribute matchup edges to the carrier hero;
   the off-meta build card label names the meta hero in its matchup line.
 - README documents Immortal, replay parsing, API key security, the local

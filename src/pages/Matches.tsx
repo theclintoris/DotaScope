@@ -63,7 +63,7 @@ export function MatchesPage() {
   const { accountId, profile } = useProfile()
   const matchMode = meta.matchMode
   const modeCopy = MATCH_MODE_COPY[matchMode]
-  const [tab, setTab] = useState<Tab>('pro')
+  const [tab, setTab] = useState<Tab>('mine')
   const [search, setSearch] = useState('')
   const [mode, setMode] = useState('all')
   const [lobby, setLobby] = useState('all')
