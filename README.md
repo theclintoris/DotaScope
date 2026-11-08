@@ -39,7 +39,7 @@ DotaScope brings hero meta, matchups, professional play, player dossiers, match 
 
 ## Draft overlay (Windows)
 
-The Windows app includes a display-only draft overlay. Start Dota 2 in **Borderless** or **Windowed** mode, have the GSI config installed, then press **Ctrl+Shift+D** to toggle the overlay. It reads the official GSI draft feed, shows enemy/ally picks and the strongest counter suggestions, and stays above the game without injecting into it. The window is click-through by design; the hotkey toggles visibility. Exclusive fullscreen can hide external overlays.
+The Windows app includes a display-only draft overlay. Start Dota 2 in **Borderless** or **Windowed** mode, have the GSI config installed, then press **Ctrl+Shift+D** to toggle the overlay. It reads the official GSI draft feed, shows enemy/ally picks and the strongest counter suggestions, and stays above the game without injecting into it. The window is click-through by design; the hotkey toggles visibility. Exclusive fullscreen can hide external overlays. Dota's GSI feed exposes the full draft in **Captains Mode**; in All Pick the overlay waits rather than inventing enemy picks.
 
 ## Ranked and Turbo auto-parse setup (Windows)
 
