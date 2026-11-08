@@ -38,12 +38,12 @@ All notable changes to DotaScope are recorded here. The public release lives at
   final-item choices on the current meta heroes, plus the heroes with the
   strongest matchup edges against those meta picks. Based on a 90-day parsed
   final-inventory sample.
-- **OpenDota API key** — optional device-local key for higher rate limits and
-  replay-parse requests. Keys are stored in `localStorage`, sent only to
-  OpenDota, never logged, and can be removed from the key dialog.
+- **Draft overlay** — a C# always-on-top overlay shares DotaScope's WebView2
+  environment and renders the live enemy/ally draft plus counter suggestions.
+  It is borderless, click-through and toggled with `Ctrl+Shift+D`; Dota must run
+  in Borderless/Windowed mode. No game injection or custom HUD is used.
 - **Vision & Utility** — parsed matches expose observer/sentry wards, dewards,
-  camps stacked, runes, stuns, smoke and gem purchases per player. Unparsed
-  matches offer a replay-parse request when a key is configured.
+  camps stacked, runes, stuns, smoke and gem purchases per player.
 - **Ward map** — locally parsed matches plot all observer and sentry placements
   on the Dota map. Hover or tap a marker for the placing hero, match time,
   expiry/destroy time; filter by ward type and Radiant/Dire. The worker now
@@ -115,7 +115,10 @@ All notable changes to DotaScope are recorded here. The public release lives at
   queue remain one click away.
 - Meta escape's item cards now attribute matchup edges to the carrier hero;
   the off-meta build card label names the meta hero in its matchup line.
-- README documents Immortal, replay parsing, API key security, the local
+- Native builds now hide the install CTA because the app is already installed,
+  and all OpenDota API-key prompts/dialogs/buttons were removed. Replay parsing
+  is local/shared only; no key is requested anywhere in the UI.
+- README documents Immortal, replay parsing, the Draft overlay, the local
   parser worker, auto-parse prerequisites, and the Source/attribution for
   Spectral. The public match feed is described honestly as ranked/standard only;
   Turbo history is OpenDota's latest-20 sample extended by local parses.

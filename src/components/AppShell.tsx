@@ -7,7 +7,6 @@ import {
   Crosshair,
   Database,
   Download,
-  KeyRound,
   LayoutDashboard,
   LogIn,
   Medal,
@@ -30,11 +29,11 @@ import { useProfile } from '../context/ProfileContext'
 import { useInstallPrompt, useInterval, useLockBodyScroll, useOnlineStatus } from '../lib/hooks'
 import { classNames, timeAgo } from '../lib/format'
 import { isNativeGsiHost } from '../lib/gsi'
+import { isNativeShell } from '../lib/pwa'
 import { syncSharedTurboHistory } from '../lib/sharedArchive'
 import { Brand } from './Brand'
 import { MetaLens } from './MetaLens'
 import { CommandPalette } from './CommandPalette'
-import { ApiKeyDialog } from './ApiKeyDialog'
 import { AutoParserWatcher } from './AutoParserWatcher'
 import { InstallDialog } from './InstallDialog'
 import { ProfileDialog } from './ProfileDialog'
@@ -102,7 +101,6 @@ export function AppShell() {
   const [moreOpen, setMoreOpen] = useState(false)
   const [installOpen, setInstallOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  const [apiKeyOpen, setApiKeyOpen] = useState(false)
   const [, setTick] = useState(0)
   const syncedAccount = useRef<number | null>(null)
   const section = resolveSection(location.pathname)
@@ -120,12 +118,6 @@ export function AppShell() {
   useEffect(() => {
     setMoreOpen(false)
   }, [location.pathname])
-
-  useEffect(() => {
-    const openApiKey = () => setApiKeyOpen(true)
-    window.addEventListener('dotascope:open-api-key', openApiKey)
-    return () => window.removeEventListener('dotascope:open-api-key', openApiKey)
-  }, [])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -210,22 +202,26 @@ export function AppShell() {
 
           <div className="sidebar-rule" />
           <div className="sidebar-install">
-            <span className="sidebar-label">App</span>
-            {installed ? (
-              <span className="installed-pill">
-                <BadgeCheck size={14} /> Installed
-              </span>
-            ) : (
-              <button type="button" className="install-btn" onClick={openInstall}>
-                <span className="install-btn-icon">
-                  <MonitorDown size={17} />
-                </span>
-                <span>
-                  <strong>Install DotaScope</strong>
-                  <small>PC &amp; Android</small>
-                </span>
-              </button>
-            )}
+            {!isNativeShell() ? (
+              <>
+                <span className="sidebar-label">App</span>
+                {installed ? (
+                  <span className="installed-pill">
+                    <BadgeCheck size={14} /> Installed
+                  </span>
+                ) : (
+                  <button type="button" className="install-btn" onClick={openInstall}>
+                    <span className="install-btn-icon">
+                      <MonitorDown size={17} />
+                    </span>
+                    <span>
+                      <strong>Install DotaScope</strong>
+                      <small>PC &amp; Android</small>
+                    </span>
+                  </button>
+                )}
+              </>
+            ) : null}
             <div className="sidebar-credit">
               <span className="live-dot" />
               Data by OpenDota
@@ -291,15 +287,6 @@ export function AppShell() {
               title="Refresh meta data"
             >
               <RefreshCw size={16} className={meta.loading ? 'spin' : undefined} />
-            </button>
-            <button
-              type="button"
-              className="icon-btn api-key-btn"
-              onClick={() => setApiKeyOpen(true)}
-              aria-label="OpenDota API key"
-              title="OpenDota API key"
-            >
-              <KeyRound size={16} />
             </button>
             <button
               type="button"
@@ -391,7 +378,6 @@ export function AppShell() {
 
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} />
       <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
-      <ApiKeyDialog open={apiKeyOpen} onClose={() => setApiKeyOpen(false)} />
       <AutoParserWatcher />
       <InstallDialog
         open={installOpen}
@@ -472,15 +458,17 @@ export function AppShell() {
               <MetaLens compact />
 
               <div className="sheet-install">
-                {installed ? (
-                  <span className="installed-pill">
-                    <BadgeCheck size={15} /> Installed on this device
-                  </span>
-                ) : (
-                  <button type="button" className="btn btn-primary btn-wide" onClick={openInstall}>
-                    <Download size={15} /> Install on PC &amp; Android
-                  </button>
-                )}
+                {!isNativeShell() ? (
+                  installed ? (
+                    <span className="installed-pill">
+                      <BadgeCheck size={15} /> Installed on this device
+                    </span>
+                  ) : (
+                    <button type="button" className="btn btn-primary btn-wide" onClick={openInstall}>
+                      <Download size={15} /> Install on PC &amp; Android
+                    </button>
+                  )
+                ) : null}
                 <button
                   type="button"
                   className="btn btn-ghost btn-wide"
@@ -490,16 +478,6 @@ export function AppShell() {
                   }}
                 >
                   <Database size={15} /> Open SQL data lab
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-quiet btn-wide"
-                  onClick={() => {
-                    setMoreOpen(false)
-                    setApiKeyOpen(true)
-                  }}
-                >
-                  <KeyRound size={15} /> OpenDota API key
                 </button>
               </div>
 

@@ -12,7 +12,6 @@ import {
   Crosshair,
   Database,
   Eye,
-  KeyRound,
   Layers3,
   Shield,
   Skull,
@@ -28,11 +27,10 @@ import type {
   PickBan,
 } from '../types'
 import { useMeta } from '../context/MetaContext'
-import { requestMatchParse, TTL } from '../lib/api'
+import { TTL } from '../lib/api'
 import { mergeLocalMatch, useArchiveMatchStats } from '../lib/localMatchStats'
 import { WardMap } from '../components/WardMap'
 import { useDocumentTitle, useRemote } from '../lib/hooks'
-import { hasOpenDotaKey } from '../lib/settings'
 import {
   gameModeName,
   heroImage,
@@ -65,8 +63,6 @@ export function MatchDetailPage() {
   const localStats = useArchiveMatchStats(matchId)
   const items = useRemote<ItemConstants>('/constants/items', TTL.constants)
   const [chartMode, setChartMode] = useState<'gold' | 'xp'>('gold')
-  const [parseState, setParseState] = useState<'idle' | 'requesting' | 'queued' | 'error'>('idle')
-  const [parseError, setParseError] = useState<string | null>(null)
   const remoteMatch = detail.data
   const match = useMemo(
     () => (remoteMatch && localStats.data ? mergeLocalMatch(remoteMatch, localStats.data) : remoteMatch),
@@ -98,23 +94,6 @@ export function MatchDetailPage() {
       dire: sorted.filter((player) => !player.isRadiant),
     }
   }, [match])
-
-  const requestParse = async () => {
-    if (!match) return
-    if (!hasOpenDotaKey()) {
-      window.dispatchEvent(new Event('dotascope:open-api-key'))
-      return
-    }
-    setParseState('requesting')
-    setParseError(null)
-    try {
-      await requestMatchParse(match.match_id)
-      setParseState('queued')
-    } catch (error) {
-      setParseState('error')
-      setParseError(error instanceof Error ? error.message : 'Could not request a replay parse.')
-    }
-  }
 
   if (detail.loading && !match) return <PageLoader label="Loading match dossier…" />
 
@@ -308,43 +287,13 @@ export function MatchDetailPage() {
           />
           <div className="parse-panel-body">
             <div>
-              {noReplaySource ? (
-                <p className="muted-copy">
-                  DotaScope found no local or shared parse, and Valve has not published a replay URL
-                  for this match. Download the replay in Dota 2 → Profile → Match History, then the
-                  replay-folder watcher will parse it automatically. If DotaScope is open when a replay
-                  source becomes available, it is retried automatically for 24 hours.
-                </p>
-              ) : (
-                <p className="muted-copy">
-                  OpenDota can parse the replay for deeper economy and utility data. Replay parsing
-                  is a paid OpenDota feature, so it needs your own API key.
-                </p>
-              )}
-              {parseError && <p className="inline-error">{parseError}</p>}
-              {parseState === 'queued' && (
-                <p className="inline-alert">
-                  Parse requested. OpenDota usually finishes within a minute — refresh this match shortly.
-                </p>
-              )}
+              <p className="muted-copy">
+                DotaScope parses replays locally. Download the replay in Dota 2 → Profile → Match
+                History, then DotaScope’s replay-folder watcher will parse it automatically. You can
+                also open a replay directly in Parser lab.
+              </p>
             </div>
             <div className="parse-panel-actions">
-              {!noReplaySource && (
-                !hasOpenDotaKey() ? (
-                  <button type="button" className="btn btn-primary" onClick={requestParse}>
-                    <KeyRound size={15} /> Add API key
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={requestParse}
-                    disabled={parseState === 'requesting' || parseState === 'queued'}
-                  >
-                    <Database size={15} /> {parseState === 'requesting' ? 'Requesting…' : parseState === 'queued' ? 'Queued' : 'Request replay parse'}
-                  </button>
-                )
-              )}
               <button
                 type="button"
                 className="btn btn-ghost"

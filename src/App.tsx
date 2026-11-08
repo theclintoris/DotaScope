@@ -11,6 +11,7 @@ import { PlayersPage } from './pages/Players'
 import { PlayerDetailPage } from './pages/PlayerDetail'
 import { PlayerHeroDetailPage } from './pages/PlayerHeroDetail'
 import { DraftPage } from './pages/Draft'
+import { DraftOverlayPage } from './pages/DraftOverlay'
 import { MetaEscapePage } from './pages/MetaEscape'
 import { ParserLabPage } from './pages/ParserLab'
 import { ProPage } from './pages/Pro'
@@ -25,6 +26,7 @@ function App() {
         <HashRouter>
           <ScrollToTop />
           <Routes>
+            <Route path="overlay" element={<DraftOverlayPage />} />
             <Route element={<AppShell />}>
               <Route index element={<OverviewPage />} />
               <Route path="heroes" element={<HeroesPage />} />

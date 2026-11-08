@@ -260,6 +260,7 @@ internal sealed class MainForm : Form
     private readonly string _webRoot;
     private readonly WebView2 _webView;
     private readonly string _cacheRoot;
+    private OverlayForm? _overlay;
 
     public MainForm(string webRoot, string cacheRoot)
     {
@@ -379,6 +380,15 @@ internal sealed class MainForm : Form
             };
 
             core.Navigate(BuildStartUrl());
+
+            // The overlay shares this WebView2 environment (and therefore
+            // its browser process/profile) but owns a separate click-through
+            // window. It stays hidden until Ctrl+Shift+D or debug startup.
+            _overlay = new OverlayForm(environment, _webRoot);
+            if (Environment.GetEnvironmentVariable("DOTASCOPE_OVERLAY_DEBUG") == "1")
+            {
+                _overlay.ShowOverlay();
+            }
         }
         catch (Exception ex)
         {
@@ -394,6 +404,12 @@ internal sealed class MainForm : Form
                 MessageBoxIcon.Error);
             Close();
         }
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        _overlay?.Close();
+        base.OnFormClosing(e);
     }
 
     private const string ProgramHost = "dotascope.local";

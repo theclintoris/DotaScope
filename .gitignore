@@ -30,6 +30,7 @@ android/*.keystore
 windows/bin/
 windows/obj/
 windows/bundle-temp/
+windows/web-package/
 windows/data/
 windows/data-*/
 worker/data/

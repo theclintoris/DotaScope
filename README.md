@@ -18,13 +18,14 @@ DotaScope brings hero meta, matchups, professional play, player dossiers, match 
 - **Hero index** — search and filter by attribute, role, attack type and Captain's Mode eligibility; sort by win rate, pick share, picks, trend, meta grade or pro presence; export CSV. Every hero carries an S–D current-meta grade derived from win and pick strength.
 - **Hero dossier** — matchups, duration profile, item phases, bracket spread, pro pick/ban presence, daily pick history and base stats.
 - **Matches** — opens on **My matches**, your own ranked or Turbo history from the pinned profile; the latest pro and public feeds remain one click away. Includes league, team, mode, lobby, rank, duration and time filters on the public feed, and mode-aware result/KDA cards for your games.
-- **Match detail** — gold/XP advantage chart, both scoreboards, items, KDA, GPM/XPM, last hits/denies, damage, a pick/ban draft board and a parsed **Vision & Utility** breakdown (observer/sentry wards, dewards, camps stacked, runes and stuns). Locally parsed matches are merged from the worker's `/stats` payload and show **Parsed locally** instead of prompting for an OpenDota API key; the local parser also supplies the advantage timeline when OpenDota has no parsed data. A **ward map** plots every observer and sentry placement on the Dota map with team filters and hover timestamps. Unparsed matches can still be queued for OpenDota parsing with your own key.
+- **Match detail** — gold/XP advantage chart, both scoreboards, items, KDA, GPM/XPM, last hits/denies, damage, a pick/ban draft board and a parsed **Vision & Utility** breakdown (observer/sentry wards, dewards, camps stacked, runes and stuns). Locally parsed matches are merged from the worker's `/stats` payload and show **Parsed locally** instead of prompting for an OpenDota API key; the local parser also supplies the advantage timeline when OpenDota has no parsed data. A **ward map** plots every observer and sentry placement on the Dota map with team filters and hover timestamps. Unparsed matches explain that DotaScope needs a local replay or a shared parse; the app never asks for an OpenDota key.
 - **Players** — global OpenDota player search, numeric account shortcut, and a searchable professional directory.
 - **Player profile** — career W/L, rank, estimated MMR, recent form, hero pool, match log, lane mix and attribute comfort, filtered by the global Ranked/Turbo lens. Hero-pool and match-log rows show the current meta grade plus a +/− flag comparing the player's hero win rate with the OpenDota baseline for their own rank bracket. Turbo uses OpenDota's latest-20 sample plus locally parsed Turbo history; the UI labels the sample source.
 - **Performance review** — OpenDota hero-benchmarked percentiles for ranked standard games, plus a Turbo form benchmark using parsed Turbo history. The Turbo panel offers three scopes: **Personal** (your latest parsed games against your earlier history), **Frequent teammates** (players you have shared at least two games with) and **My games** (every other player in your parsed Turbo matches). The recent window grows up to 20 games while keeping an earlier baseline. Each includes linked heuristic flags and a strongest-signal callout; OpenDota has no global Turbo benchmark split, so the comparisons are explicit local baselines rather than population percentiles.
 - **Turbo Elo ladder** — every player found in a locally parsed Turbo match starts at 1,000 and moves through team-average Elo (K=32). The player dossier shows your current/peak rating, last change, match history and the top of the players you have shared a lobby with. This is a local DotaScope ladder, not Valve MMR.
 - **Player hero dossier** — click any hero in a player's pool or match log for hero-specific win rate, form, KDA, final-item telemetry, recent builds and the full paginated match archive on that hero.
 - **Draft lab** — a 5v5 counter-pick board for both line-ups, with role-filtered suggestions, matchup edges, item-independent meta blends and an MMR bracket guardrail. The bracket control reweights suggestions by that rank's win/pick rates; OpenDota does not publish bracket-split head-to-head samples, which the screen states explicitly. Signed-in players can weight suggestions by their own hero pool, with personal sample size and win rate shown on each card.
+- **Draft overlay** — on Windows, press `Ctrl+Shift+D` to show or hide an always-on-top, click-through HUD that reads the live enemy/ally draft from GSI and lists counter suggestions. It is an external window (no game injection or custom HUD); Dota must be in Borderless/Windowed mode.
 - **Parser lab** — local OpenDota replay parser for Ranked standard and Turbo games plus utility data. Runs on your PC, never uploads the replay; see the local parser setup below. The **Turbo backfill** queue loads the available recent Turbo sample or accepts pasted match IDs, downloads Valve replays through OpenDota URLs where available, and parses newest-first while the worker stays open. It is honest about the limits: OpenDota exposes only the latest 20 Turbo matches, and Valve replay retention is finite, so a full career cannot be reconstructed for expired matches.
 - **Ranked and Turbo history** — auto-parses finished Ranked standard and Turbo games on Windows through the local OpenDota worker. Ranked replays are parsed when available locally or through a Valve replay URL; Turbo history also grows past OpenDota’s 20-game public cap. Parsed rows extend the relevant player, Records and benchmark samples and stay on the PC.
 - **Meta escape** — underplayed and underbought options with evidence. The board surfaces below-median heroes with winning matchup samples into the current top five, plus expensive low-purchase-rate items and the escape heroes who actually buy them. Counter edges are clearly attributed to the carrier hero, not the item, because OpenDota does not publish item-specific matchups. A nested **Off-meta builds** board adds unusual final-item choices on the current meta heroes, their buy-rate lift and the heroes best positioned against them.
@@ -35,6 +36,10 @@ DotaScope brings hero meta, matchups, professional play, player dossiers, match 
 - **Records** — twelve historical record books across parsed public matches, plus **personal records** for your pinned profile. Personal bests follow the Ranked/Turbo lens and can be narrowed to one hero; ranked scans all available ranked match history, while Turbo combines OpenDota’s sample with locally parsed history. Parsed Ranked and Turbo games also unlock GPM, XPM, last-hit and hero-damage record cards.
 - **Data Lab** — a read-only OpenDota SQL editor with a table/schema browser, examples, CSV export and a hard 100-row cap.
 - **PWA shell** — install prompt, service worker, offline shell, safe-area mobile navigation, command palette (`Ctrl/⌘ K`) and responsive layouts from 390 px upward.
+
+## Draft overlay (Windows)
+
+The Windows app includes a display-only draft overlay. Start Dota 2 in **Borderless** or **Windowed** mode, have the GSI config installed, then press **Ctrl+Shift+D** to toggle the overlay. It reads the official GSI draft feed, shows enemy/ally picks and the strongest counter suggestions, and stays above the game without injecting into it. The window is click-through by design; the hotkey toggles visibility. Exclusive fullscreen can hide external overlays.
 
 ## Ranked and Turbo auto-parse setup (Windows)
 
@@ -165,21 +170,7 @@ Your selected profile is stored only on the device (`localStorage`). It appears 
 - **Web / PWA:** **Sign in with Steam** opens Steam's OpenID page. After Steam redirects back, DotaScope uses the returned public SteamID to find the matching OpenDota account. Because the app is fully static and has no backend, this is a public profile link, not a verified secure session. Manual Steam-profile, SteamID64 or Dota account-ID entry is also available.
 - **Android:** there is no local Steam client to read, so use manual profile entry. The APK has no account password or private Steam data access.
 
-The app never asks for a Steam password, Steam Guard code, or private inventory data. An **optional** OpenDota API key is stored only on this device and used solely for rate limits and replay-parse requests. OpenDota profiles must be public.
-
-## OpenDota API key (optional)
-
-OpenDota's free tier is enough for browsing, but a personal API key raises your
-rate limit and enables replay-parse requests. Open it from the key icon in the
-top bar or from the mobile More sheet.
-
-- The key is stored only in this browser's `localStorage` (`dotascope.opendotaKey.v1`).
-- It is sent directly to OpenDota as an `api_key` query parameter and is never
-  logged, uploaded to DotaScope, or committed to the repository.
-- The match page exposes **Request replay parse** only when a key is configured.
-  Parsed matches show the Vision & Utility panel for wards, dewards, stacks,
-  runes and stuns.
-- Use **Remove key** in the same dialog to delete it from the device.
+The app never asks for a Steam password, Steam Guard code, private inventory data, or an OpenDota API key. OpenDota profiles must be public.
 
 ## Steam library artwork
 
@@ -232,7 +223,7 @@ Dotabuff does not publish a general public API. **This is not a pixel-for-pixel 
 - **Records** — the global record books use parsed public matches; unparsed and private games are excluded. Personal ranked records scan the account’s ranked match list returned by OpenDota; personal Turbo records use the latest-20 public sample plus every local parsed Turbo game. GPM/XPM/last-hit/hero-damage personal records appear when the matching parsed Ranked or Turbo games are available locally; the row source is labelled.
 - **Friends / squad** — Steam does not expose a player's private friend list to a client-only OpenDota app. DotaScope shows OpenDota's public `peers` history instead (the people you queue with most) and labels it honestly.
 - **Public feed** — the latest 100 matches; direct match-ID lookup is available for older games.
-- **Parsing** — some matches are unparsed, so items, drafts and economy charts can be incomplete. Bring your own OpenDota API key to request a replay parse from the match page; OpenDota handles the queue and the paid feature. Local parsed matches use the worker's scoreboard, timeline and ward data; caches created before the ward-map release can be refreshed from the match page or Parser lab. Item/ability constants come from OpenDota/Valve.
+- **Parsing** — some matches are unparsed, so items, drafts and economy charts can be incomplete. Local parsed matches use the worker's scoreboard, timeline and ward data; matches without a local replay can use a shared archive parse when available. Caches created before the ward-map release can be refreshed from the match page or Parser lab. Item/ability constants come from OpenDota/Valve.
 - **Immortal source** — the Immortal lens uses Spectral's public `imm_ranked_meta_last_7` weekly sample, attributed in the lens. It is a top-ladder estimate and is not medal-bracket split. Dotabuff and DotaProtracker have no official public API and are not scraped.
 - **Explorer** — the Data Lab is read-only, limited to the tables OpenDota exposes, and truncates/append `LIMIT 100` where needed. Heavy queries can time out.
 - **Image assets** — hero, item and team art is loaded from Valve/Steam CDNs through OpenDota URLs. The ward-map layer uses OpenDota's detailed 7.40 map asset.
@@ -243,11 +234,11 @@ DotaScope is an unofficial fan project. It is not affiliated with Valve, Dotabuf
 
 ```text
 src/
-  components/   app shell, profile panels/dialog, API key dialog, performance review,
+  components/   app shell, profile panels/dialog, draft overlay, performance review,
                 command palette, meta lens, UI primitives
   context/      global population + bracket state, local profile store
   lib/          OpenDota client, Spectral Immortal client, cache, formatters,
-                meta calculations, API key storage, Steam helpers, PWA registration
+                meta calculations, Steam helpers, PWA registration
   pages/        Overview, Heroes, HeroDetail, Draft, MetaEscape, Matches,
                 MatchDetail, Players, PlayerDetail, PlayerHeroDetail, Pro,
                 Records, DataLab, NotFound

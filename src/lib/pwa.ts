@@ -1,3 +1,11 @@
+export function isNativeShell() {
+  const nativeCapacitor = (window as Window & {
+    Capacitor?: { isNativePlatform?: () => boolean }
+  }).Capacitor
+  if (nativeCapacitor?.isNativePlatform?.()) return true
+  return new URLSearchParams(window.location.search).get('runtime') === 'desktop'
+}
+
 export function registerServiceWorker() {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return
 
