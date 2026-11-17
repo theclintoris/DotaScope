@@ -13,8 +13,8 @@ DotaScope brings hero meta, matchups, professional play, player dossiers, match 
 
 ## What is included
 
-- **Meta lens** — switch between ranked pubs, pro, turbo and Immortal populations, and ranked brackets 1–7. A Ranked/Turbo switch in the top bar keeps player dossiers, hero history and the match explorer on the same lens; the choice is shared across every page and remembered locally.
-- **Overview** — sample size, meta leader, win-rate extremes, pick pressure, trend chart, bracket/attribute distribution and the latest pro results.
+- **Meta lens** — use the top bar to switch between Ranked, Turbo, Pro and Immortal, and to select a rank bracket in Ranked mode. The app remembers the selection across pages and visits.
+- **Overview** — latest patch, sample size, the current meta leader, sortable hero rankings, daily pick trends, bracket and attribute distributions, and recent pro matches.
 - **Hero index** — search and filter by attribute, role, attack type and Captain's Mode eligibility; sort by win rate, pick share, picks, trend, meta grade or pro presence; export CSV. Every hero carries an S–D current-meta grade derived from win and pick strength.
 - **Hero dossier** — matchups, duration profile, item phases, bracket spread, pro pick/ban presence, daily pick history and base stats.
 - **Matches** — opens on **My matches**, your own ranked or Turbo history from the pinned profile; the latest pro and public feeds remain one click away. Includes league, team, mode, lobby, rank, duration and time filters on the public feed, and mode-aware result/KDA cards for your games.

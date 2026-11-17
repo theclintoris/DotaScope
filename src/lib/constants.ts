@@ -43,12 +43,11 @@ export const POPULATIONS: {
   value: Population
   label: string
   short: string
-  description: string
 }[] = [
-  { value: 'ranked', label: 'Ranked pubs', short: 'Pubs', description: 'Public ranked sample' },
-  { value: 'pro', label: 'Pro scene', short: 'Pro', description: 'Professional matches' },
-  { value: 'turbo', label: 'Turbo', short: 'Turbo', description: 'Turbo match sample' },
-  { value: 'immortal', label: 'Immortal rank', short: 'Imm', description: 'Top-ladder Spectral sample' },
+  { value: 'ranked', label: 'Ranked pubs', short: 'Ranked' },
+  { value: 'turbo', label: 'Turbo', short: 'Turbo' },
+  { value: 'pro', label: 'Pro scene', short: 'Pro' },
+  { value: 'immortal', label: 'Immortal rank', short: 'Immortal' },
 ]
 
 export const HERO_ROLES = [
