@@ -23,6 +23,7 @@ import { useDocumentTitle } from '../lib/hooks'
 import { classNames, formatDuration, formatNumber, timeAgoFromIso } from '../lib/format'
 import { fetchSharedArchiveHealth, isSharedUploadEnabled, setSharedUploadEnabled } from '../lib/sharedArchive'
 import { HeroPortrait, PageHeader, SectionHeading } from '../components/ui'
+import { ReplayCollector } from '../components/ReplayCollector'
 
 interface WorkerHealth {
   ok: boolean
@@ -319,6 +320,8 @@ export function ParserLabPage() {
           </>
         }
       />
+
+      <ReplayCollector />
 
       <section className="panel parser-intro">
         <div className="parser-intro-icon"><Cpu size={23} /></div>

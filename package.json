@@ -1,7 +1,7 @@
 {
   "name": "dotascope",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Installable Dota 2 meta intelligence cockpit powered by the OpenDota public API.",
   "author": "DotaScope",
   "type": "module",

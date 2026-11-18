@@ -1,21 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Activity,
-  BadgeCheck,
-  ChevronRight,
   Cpu,
   Crosshair,
   Database,
-  Download,
-  LayoutDashboard,
+  Ellipsis,
   LogIn,
   Medal,
-  Menu,
   MonitorDown,
   RefreshCw,
   Search,
-  SlidersHorizontal,
-  Smartphone,
+  Shield,
   Sparkles,
   Swords,
   Trophy,
@@ -23,7 +18,7 @@ import {
   WifiOff,
   X,
 } from 'lucide-react'
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useMeta } from '../context/MetaContext'
 import { useProfile } from '../context/ProfileContext'
 import { useInstallPrompt, useInterval, useLockBodyScroll, useOnlineStatus } from '../lib/hooks'
@@ -31,55 +26,71 @@ import { classNames, timeAgo } from '../lib/format'
 import { isNativeGsiHost } from '../lib/gsi'
 import { isNativeShell } from '../lib/pwa'
 import { syncSharedTurboHistory } from '../lib/sharedArchive'
+import { IMMORTAL_ATTRIBUTION } from '../lib/spectral'
 import { Brand } from './Brand'
 import { MetaLens } from './MetaLens'
 import { CommandPalette } from './CommandPalette'
 import { AutoParserWatcher } from './AutoParserWatcher'
+import { ReplayCollectorProfileSync } from './ReplayCollector'
 import { InstallDialog } from './InstallDialog'
 import { ProfileDialog } from './ProfileDialog'
 import { PlayerAvatar, RankBadge } from './ui'
 
-const NAV = [
-  { to: '/', label: 'Overview', icon: Activity, end: true },
-  { to: '/heroes', label: 'Heroes', icon: Swords },
-  { to: '/draft', label: 'Draft lab', icon: Crosshair },
-  { to: '/meta-escape', label: 'Meta escape', icon: Sparkles },
-  { to: '/matches', label: 'Matches', icon: LayoutDashboard },
-  { to: '/players', label: 'Players', icon: Users },
-  { to: '/pro', label: 'Pro scene', icon: Trophy },
-  { to: '/records', label: 'Records', icon: Medal },
-  { to: '/data-lab', label: 'Data lab', icon: Database },
-  { to: '/parser', label: 'Parser lab', icon: Cpu },
-]
+type NavigationItem = {
+  to: string
+  label: string
+  icon: typeof Activity
+  mobile?: boolean
+}
 
-const MORE_LINKS = [
-  { to: '/draft', label: 'Draft lab', hint: 'Counter-pick simulator', icon: Crosshair },
-  { to: '/meta-escape', label: 'Meta escape', hint: 'Underplayed heroes and items', icon: Sparkles },
-  { to: '/pro', label: 'Pro scene', hint: 'Teams, drafts, pro meta', icon: Trophy },
-  { to: '/records', label: 'Records', hint: 'The all-time leaderboards', icon: Medal },
-  { to: '/data-lab', label: 'Data lab', hint: 'Query OpenDota directly', icon: Database },
-  { to: '/parser', label: 'Parser lab', hint: 'Parse a local Dota replay', icon: Cpu },
+const NAV_GROUPS: { label: string; items: NavigationItem[] }[] = [
+  {
+    label: 'Tracking',
+    items: [
+      { to: '/', label: 'Overview', icon: Activity, mobile: true },
+      { to: '/matches', label: 'Matches', icon: Swords, mobile: true },
+      { to: '/players', label: 'Players', icon: Users, mobile: true },
+      { to: '/records', label: 'Records', icon: Medal },
+    ],
+  },
+  {
+    label: 'Analysis',
+    items: [
+      { to: '/heroes', label: 'Heroes', icon: Shield, mobile: true },
+      { to: '/draft', label: 'Draft lab', icon: Crosshair },
+      { to: '/meta-escape', label: 'Meta escape', icon: Sparkles },
+      { to: '/pro', label: 'Pro scene', icon: Trophy },
+    ],
+  },
+  {
+    label: 'Tools',
+    items: [
+      { to: '/data-lab', label: 'Data lab', icon: Database },
+      { to: '/parser', label: 'Parser lab', icon: Cpu },
+    ],
+  },
 ]
+const NAV_ITEMS = NAV_GROUPS.flatMap((group) => group.items)
+const MOBILE_ITEMS = NAV_ITEMS.filter((item) => item.mobile)
+const MORE_ITEMS = NAV_ITEMS.filter((item) => !item.mobile)
 
-const SECTION_META: { match: (path: string) => boolean; kicker: string; title: string }[] = [
-  { match: (path) => path === '/', kicker: 'Command center', title: 'Overview' },
-  { match: (path) => path.startsWith('/heroes/'), kicker: 'Hero dossier', title: 'Hero detail' },
-  { match: (path) => path.startsWith('/heroes'), kicker: 'Meta index', title: 'Heroes' },
-  { match: (path) => path.startsWith('/draft'), kicker: 'Draft intelligence', title: 'Draft lab' },
-  { match: (path) => path.startsWith('/meta-escape'), kicker: 'Outside the meta', title: 'Meta escape' },
-  { match: (path) => /^\/matches\/[^/]+/.test(path), kicker: 'Match dossier', title: 'Match detail' },
-  { match: (path) => path.startsWith('/matches'), kicker: 'Live feed', title: 'Matches' },
-  { match: (path) => /^\/players\/[^/]+\/heroes\/[^/]+/.test(path), kicker: 'Player hero', title: 'Hero dossier' },
-  { match: (path) => path.startsWith('/players/'), kicker: 'Player dossier', title: 'Player profile' },
-  { match: (path) => path.startsWith('/players'), kicker: 'Identity search', title: 'Players' },
-  { match: (path) => path.startsWith('/pro'), kicker: 'Circuit intelligence', title: 'Pro scene' },
-  { match: (path) => path.startsWith('/records'), kicker: 'Hall of records', title: 'Records' },
-  { match: (path) => path.startsWith('/data-lab'), kicker: 'Open data', title: 'Data lab' },
-  { match: (path) => path.startsWith('/parser'), kicker: 'Local replay intelligence', title: 'Parser lab' },
-]
-
-function resolveSection(path: string) {
-  return SECTION_META.find((entry) => entry.match(path)) ?? { kicker: 'DotaScope', title: 'Not found' }
+function NavigationLink({ item, mobile, onClick }: {
+  item: NavigationItem
+  mobile?: boolean
+  onClick?: () => void
+}) {
+  const Icon = item.icon
+  return (
+    <NavLink
+      to={item.to}
+      end={item.to === '/'}
+      className={({ isActive }) => classNames(mobile ? 'tab-link' : 'side-link', isActive && 'is-active')}
+      onClick={onClick}
+    >
+      <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
+      <span>{item.label}</span>
+    </NavLink>
+  )
 }
 
 export function ScrollToTop() {
@@ -91,8 +102,7 @@ export function ScrollToTop() {
 }
 
 export function AppShell() {
-  const location = useLocation()
-  const navigate = useNavigate()
+  const { pathname } = useLocation()
   const online = useOnlineStatus()
   const meta = useMeta()
   const { accountId, profile, connecting: profileConnecting, error: profileError } = useProfile()
@@ -103,8 +113,9 @@ export function AppShell() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [, setTick] = useState(0)
   const syncedAccount = useRef<number | null>(null)
-  const section = resolveSection(location.pathname)
-  const moreActive = MORE_LINKS.some((link) => location.pathname.startsWith(link.to))
+  const moreDialog = useRef<HTMLDialogElement>(null)
+  const moreActive = MORE_ITEMS.some(({ to }) => pathname === to || pathname.startsWith(`${to}/`))
+  const syncLabel = meta.lastUpdated ? `Synced ${timeAgo(meta.lastUpdated / 1000)}` : undefined
 
   useInterval(() => setTick((tick) => tick + 1), 60_000)
   useLockBodyScroll(moreOpen)
@@ -117,12 +128,29 @@ export function AppShell() {
 
   useEffect(() => {
     setMoreOpen(false)
-  }, [location.pathname])
+  }, [pathname])
+
+  useEffect(() => {
+    const dialog = moreDialog.current
+    if (!moreOpen || !dialog) return
+    dialog.showModal()
+    // More is only available while the mobile tab bar is visible.
+    const desktop = window.matchMedia('(min-width: 981px)')
+    const closeOnDesktop = (event: MediaQueryListEvent) => {
+      if (event.matches) setMoreOpen(false)
+    }
+    desktop.addEventListener('change', closeOnDesktop)
+    return () => {
+      desktop.removeEventListener('change', closeOnDesktop)
+      dialog.close()
+    }
+  }, [moreOpen])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
+        setMoreOpen(false)
         setCommandOpen((open) => !open)
       }
     }
@@ -131,178 +159,93 @@ export function AppShell() {
   }, [])
 
   const openInstall = () => {
-    if (installed) return
+    setMoreOpen(false)
     if (canInstall) {
-      void install().then((accepted) => {
-        if (accepted) setMoreOpen(false)
-      })
+      void install()
     } else {
       setInstallOpen(true)
-      setMoreOpen(false)
     }
   }
+
+  const account = (
+    <div className="sidebar-account">
+      {profile && accountId ? (
+        <Link className="sidebar-profile" to={`/players/${accountId}`} onClick={() => setMoreOpen(false)}>
+          <PlayerAvatar src={profile.profile.avatarfull} name={profile.profile.personaname} size="sm" />
+          <span className="sidebar-profile-copy">
+            <strong>{profile.profile.personaname}</strong>
+            <small>My profile</small>
+          </span>
+          <RankBadge rankTier={profile.rank_tier} size="sm" />
+        </Link>
+      ) : (
+        <button
+          type="button"
+          className="sidebar-signin"
+          disabled={profileConnecting}
+          onClick={() => {
+            setMoreOpen(false)
+            setProfileOpen(true)
+          }}
+        >
+          <LogIn size={16} aria-hidden="true" />
+          <strong>{profileConnecting ? 'Syncing Steam…' : 'Sign in with Steam'}</strong>
+        </button>
+      )}
+      {profileError && <span className="sidebar-profile-error">{profileError}</span>}
+      {!installed && !isNativeShell() && (
+        <button type="button" className="install-btn" onClick={openInstall}>
+          <MonitorDown size={16} aria-hidden="true" />
+          Install DotaScope
+        </button>
+      )}
+    </div>
+  )
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="sidebar-brand">
-          <Brand />
-        </div>
+        <div className="sidebar-brand"><Brand /></div>
         <div className="sidebar-scroll">
-          <span className="sidebar-label">Navigate</span>
           <nav className="side-nav" aria-label="Primary navigation">
-            {NAV.map((item) => {
-              const Icon = item.icon
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  className={({ isActive }) => classNames('side-link', isActive && 'is-active')}
-                >
-                  <Icon size={17} strokeWidth={1.8} />
-                  <span>{item.label}</span>
-                  <ChevronRight size={13} className="side-link-arrow" />
-                </NavLink>
-              )
-            })}
+            {NAV_GROUPS.map((group) => (
+              <div className="side-nav-group" key={group.label}>
+                <p className="sidebar-label">{group.label}</p>
+                {group.items.map((item) => <NavigationLink key={item.to} item={item} />)}
+              </div>
+            ))}
           </nav>
-
-          <div className="sidebar-rule" />
-          <MetaLens />
-
-          <div className="sidebar-rule" />
-          <div className="sidebar-account">
-            <span className="sidebar-label">Profile</span>
-            {profile && accountId ? (
-              <Link className="sidebar-profile" to={`/players/${accountId}`}>
-                <PlayerAvatar src={profile.profile.avatarfull} name={profile.profile.personaname} size="sm" />
-                <span className="sidebar-profile-copy">
-                  <strong>{profile.profile.personaname}</strong>
-                  <small>Open my dossier</small>
-                </span>
-                <RankBadge rankTier={profile.rank_tier} size="sm" />
-              </Link>
-            ) : (
-              <button
-                type="button"
-                className="sidebar-signin"
-                onClick={() => setProfileOpen(true)}
-                disabled={profileConnecting}
-              >
-                <span className="sidebar-signin-icon"><LogIn size={16} /></span>
-                <span>
-                  <strong>{profileConnecting ? 'Syncing Steam…' : 'Sign in with Steam'}</strong>
-                  <small>Pin your dossier to the top</small>
-                </span>
-              </button>
-            )}
-            {profileError ? <span className="sidebar-profile-error">{profileError}</span> : null}
-          </div>
-
-          <div className="sidebar-rule" />
-          <div className="sidebar-install">
-            {!isNativeShell() ? (
-              <>
-                <span className="sidebar-label">App</span>
-                {installed ? (
-                  <span className="installed-pill">
-                    <BadgeCheck size={14} /> Installed
-                  </span>
-                ) : (
-                  <button type="button" className="install-btn" onClick={openInstall}>
-                    <span className="install-btn-icon">
-                      <MonitorDown size={17} />
-                    </span>
-                    <span>
-                      <strong>Install DotaScope</strong>
-                      <small>PC &amp; Android</small>
-                    </span>
-                  </button>
-                )}
-              </>
-            ) : null}
-            <div className="sidebar-credit">
-              <span className="live-dot" />
-              Data by OpenDota
-            </div>
-          </div>
+          {account}
         </div>
       </aside>
 
       <div className="shell-main">
         <header className="topbar">
-          <div className="topbar-mobile-brand">
-            <Brand compact />
-          </div>
-          <div className="topbar-context">
-            <span className="topbar-kicker">{section.kicker}</span>
-            <strong>{section.title}</strong>
-          </div>
-
+          <div className="topbar-mobile-brand"><Brand compact /></div>
           <button
             type="button"
             className="search-trigger"
             onClick={() => setCommandOpen(true)}
             aria-label="Search heroes, players, or a match ID"
           >
-            <Search size={16} />
+            <Search size={17} />
             <span>Search heroes, players, match ID…</span>
             <kbd>Ctrl K</kbd>
           </button>
 
+          <MetaLens />
+
           <div className="topbar-actions">
-            <div className="topbar-mode" role="group" aria-label="Meta population">
-              <button
-                type="button"
-                className={classNames('topbar-mode-btn', meta.population === 'ranked' && 'is-active')}
-                aria-pressed={meta.population === 'ranked'}
-                onClick={() => meta.setPopulation('ranked')}
-                title="Show ranked matchmaking stats"
-              >
-                Ranked
-              </button>
-              <button
-                type="button"
-                className={classNames('topbar-mode-btn', meta.population === 'turbo' && 'is-active')}
-                aria-pressed={meta.population === 'turbo'}
-                onClick={() => meta.setPopulation('turbo')}
-                title="Show Turbo stats"
-              >
-                Turbo
-              </button>
-            </div>
-            <span className={classNames('source-pill', !online && 'is-offline')}>
-              <span className="live-dot" />
-              <span className="source-pill-label">{online ? 'OpenDota live' : 'Offline cache'}</span>
-            </span>
-            {meta.lastUpdated && (
-              <span className="sync-time">Synced {timeAgo(meta.lastUpdated / 1000)}</span>
-            )}
+            {syncLabel && <span className="sync-time">{syncLabel}</span>}
             <button
               type="button"
               className="icon-btn"
               onClick={meta.refresh}
+              disabled={meta.loading}
               aria-label="Refresh meta data"
-              title="Refresh meta data"
+              title={syncLabel ? `Refresh meta data · ${syncLabel}` : 'Refresh meta data'}
             >
               <RefreshCw size={16} className={meta.loading ? 'spin' : undefined} />
-            </button>
-            <button
-              type="button"
-              className="icon-btn mobile-filter-btn"
-              onClick={() => setMoreOpen(true)}
-              aria-label="Open filters and more"
-            >
-              <SlidersHorizontal size={17} />
-            </button>
-            <button
-              type="button"
-              className="icon-btn menu-btn"
-              onClick={() => setMoreOpen(true)}
-              aria-label="Open menu"
-            >
-              <Menu size={18} />
             </button>
           </div>
         </header>
@@ -310,10 +253,7 @@ export function AppShell() {
         {!online && (
           <div className="offline-banner" role="status">
             <WifiOff size={15} />
-            <span>
-              You are offline. Showing the last OpenDota snapshot cached on this device — some pages may be
-              limited.
-            </span>
+            <span>Offline. Cached OpenDota data is available on some pages.</span>
           </div>
         )}
 
@@ -322,56 +262,24 @@ export function AppShell() {
         </main>
 
         <footer className="app-footer">
-          <div>
-            <strong>DOTASCOPE</strong>
-            <span>Unofficial Dota 2 intelligence · built for PC &amp; Android</span>
-          </div>
-          <div className="app-footer-links">
-            <a href="https://www.opendota.com" target="_blank" rel="noreferrer">
-              Data by OpenDota
-            </a>
-            <span className="footer-sep">/</span>
-            <span>Not affiliated with Valve</span>
-          </div>
+          <a href="https://www.opendota.com" target="_blank" rel="noreferrer">Data by OpenDota</a>
+          {meta.population === 'immortal' && (
+            <a href={IMMORTAL_ATTRIBUTION} target="_blank" rel="noreferrer">Immortal data by Spectral</a>
+          )}
+          <span>Unofficial Dota 2 tracker</span>
         </footer>
       </div>
 
       <nav className="mobile-tabbar" aria-label="Mobile navigation">
-        <NavLink
-          to="/"
-          end
-          className={({ isActive }) => classNames('tab-link', isActive && 'is-active')}
-        >
-          <Activity size={19} />
-          <span>Home</span>
-        </NavLink>
-        <NavLink
-          to="/heroes"
-          className={({ isActive }) => classNames('tab-link', isActive && 'is-active')}
-        >
-          <Swords size={19} />
-          <span>Heroes</span>
-        </NavLink>
-        <NavLink
-          to="/matches"
-          className={({ isActive }) => classNames('tab-link', isActive && 'is-active')}
-        >
-          <LayoutDashboard size={19} />
-          <span>Matches</span>
-        </NavLink>
-        <NavLink
-          to="/players"
-          className={({ isActive }) => classNames('tab-link', isActive && 'is-active')}
-        >
-          <Users size={19} />
-          <span>Players</span>
-        </NavLink>
+        {MOBILE_ITEMS.map((item) => <NavigationLink key={item.to} item={item} mobile />)}
         <button
           type="button"
           className={classNames('tab-link', (moreOpen || moreActive) && 'is-active')}
           onClick={() => setMoreOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={moreOpen}
         >
-          <Menu size={19} />
+          <Ellipsis size={19} aria-hidden="true" />
           <span>More</span>
         </button>
       </nav>
@@ -379,6 +287,7 @@ export function AppShell() {
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} />
       <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
       <AutoParserWatcher />
+      <ReplayCollectorProfileSync />
       <InstallDialog
         open={installOpen}
         onClose={() => setInstallOpen(false)}
@@ -388,106 +297,35 @@ export function AppShell() {
       />
 
       {moreOpen && (
-        <div className="overlay sheet-overlay" role="presentation" onMouseDown={() => setMoreOpen(false)}>
-          <div
-            className="mobile-sheet"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Menu and meta filters"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <div className="sheet-handle" />
-            <div className="sheet-head">
-              <div>
-                <span className="eyebrow">Explore &amp; tune</span>
-                <h2>DotaScope menu</h2>
-              </div>
-              <button type="button" className="icon-btn" onClick={() => setMoreOpen(false)} aria-label="Close menu">
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="sheet-scroll">
-              <div className="sheet-account">
-                {profile && accountId ? (
-                  <Link className="sheet-profile" to={`/players/${accountId}`} onClick={() => setMoreOpen(false)}>
-                    <PlayerAvatar src={profile.profile.avatarfull} name={profile.profile.personaname} size="md" />
-                    <span>
-                      <span className="eyebrow">PINNED PROFILE</span>
-                      <strong>{profile.profile.personaname}</strong>
-                      <small>Open my dossier</small>
-                    </span>
-                    <RankBadge rankTier={profile.rank_tier} size="sm" />
-                  </Link>
-                ) : (
-                  <button
-                    type="button"
-                    className="sheet-signin"
-                    onClick={() => {
-                      setMoreOpen(false)
-                      setProfileOpen(true)
-                    }}
-                  >
-                    <LogIn size={18} />
-                    <span>
-                      <strong>{profileConnecting ? 'Syncing Steam…' : 'Sign in with Steam'}</strong>
-                      <small>Pin your public profile to Players</small>
-                    </span>
-                  </button>
-                )}
-              </div>
-
-              <div className="sheet-links">
-                {MORE_LINKS.map((link) => {
-                  const Icon = link.icon
-                  return (
-                    <Link key={link.to} to={link.to} className="sheet-link">
-                      <span className="sheet-link-icon">
-                        <Icon size={18} />
-                      </span>
-                      <span>
-                        <strong>{link.label}</strong>
-                        <small>{link.hint}</small>
-                      </span>
-                      <ChevronRight size={15} />
-                    </Link>
-                  )
-                })}
-              </div>
-
-              <MetaLens compact />
-
-              <div className="sheet-install">
-                {!isNativeShell() ? (
-                  installed ? (
-                    <span className="installed-pill">
-                      <BadgeCheck size={15} /> Installed on this device
-                    </span>
-                  ) : (
-                    <button type="button" className="btn btn-primary btn-wide" onClick={openInstall}>
-                      <Download size={15} /> Install on PC &amp; Android
-                    </button>
-                  )
-                ) : null}
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-wide"
-                  onClick={() => {
-                    setMoreOpen(false)
-                    navigate('/data-lab')
-                  }}
-                >
-                  <Database size={15} /> Open SQL data lab
-                </button>
-              </div>
-
-              <div className="sheet-credit">
-                <Smartphone size={14} />
-                <span>One responsive app · desktop, tablet, Android homescreen</span>
-              </div>
-            </div>
+        <dialog
+          className="mobile-sheet"
+          ref={moreDialog}
+          aria-labelledby="more-title"
+          onCancel={(event) => {
+            event.preventDefault()
+            setMoreOpen(false)
+          }}
+          onClick={(event) => {
+            if (event.target !== event.currentTarget) return
+            const bounds = event.currentTarget.getBoundingClientRect()
+            if (event.clientY < bounds.top) setMoreOpen(false)
+          }}
+        >
+          <div className="sheet-head">
+            <h2 id="more-title">More</h2>
+            <button type="button" className="icon-btn" onClick={() => setMoreOpen(false)} aria-label="Close menu">
+              <X size={18} />
+            </button>
           </div>
-        </div>
+          <div className="sheet-scroll">
+            <nav className="sheet-links" aria-label="More pages">
+              {MORE_ITEMS.map((item) => (
+                <NavigationLink key={item.to} item={item} onClick={() => setMoreOpen(false)} />
+              ))}
+            </nav>
+            {account}
+          </div>
+        </dialog>
       )}
     </div>
   )

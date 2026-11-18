@@ -1,4 +1,4 @@
-DotaScope 1.0.0 — Full portable build
+DotaScope 1.1.0 — Full portable build
 =====================================
 
 This folder contains everything needed for the local parser, automatic
@@ -14,10 +14,13 @@ QUICK START
    - If Steam is open, close it when Setup asks, then press Enter.
    - Setup installs the Dota 2 GSI config and sets the Dota 2 launch option
      to -gamestateintegration.
-3. Start DotaScope-1.0.0-win-x64.exe.
+3. Start DotaScope-1.1.0-win-x64.exe.
 4. In DotaScope, open Parser lab and confirm "WORKER ONLINE".
 5. Play Dota 2 normally from Steam. Finished Ranked and Turbo matches are
    parsed automatically when a replay is available.
+6. For Valve replay lookup, open Automatic Turbo replays in Parser lab,
+   choose Connect with Steam Guard, and scan with a separate Steam account
+   that has Dota 2. This is a one-time setup. Use your usual account to play.
 
 If automatic parsing does not start, open Dota 2, play/spectate a match,
 and check Parser lab. Steam must be fully restarted after Setup changes the
@@ -26,7 +29,7 @@ launch option.
 WHAT IS INCLUDED
 ----------------
 - DotaScope Windows app and WebView2 host
-- worker/parser-worker.mjs
+- worker/parser-worker.mjs and worker/replay-collector.mjs
 - runtime/node/node.exe (Node.js 26)
 - runtime/jre (minimal Java 21 runtime)
 - runtime/7z/7z.exe

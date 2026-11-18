@@ -13,8 +13,8 @@ DotaScope brings hero meta, matchups, professional play, player dossiers, match 
 
 ## What is included
 
-- **Meta lens** — switch between ranked pubs, pro, turbo and Immortal populations, and ranked brackets 1–7. A Ranked/Turbo switch in the top bar keeps player dossiers, hero history and the match explorer on the same lens; the choice is shared across every page and remembered locally.
-- **Overview** — sample size, meta leader, win-rate extremes, pick pressure, trend chart, bracket/attribute distribution and the latest pro results.
+- **Meta lens** — use the top bar to switch between Ranked, Turbo, Pro and Immortal, and to select a rank bracket in Ranked mode. The app remembers the selection across pages and visits.
+- **Overview** — latest patch, sample size, the current meta leader, sortable hero rankings, daily pick trends, bracket and attribute distributions, and recent pro matches.
 - **Hero index** — search and filter by attribute, role, attack type and Captain's Mode eligibility; sort by win rate, pick share, picks, trend, meta grade or pro presence; export CSV. Every hero carries an S–D current-meta grade derived from win and pick strength.
 - **Hero dossier** — matchups, duration profile, item phases, bracket spread, pro pick/ban presence, daily pick history and base stats.
 - **Matches** — opens on **My matches**, your own ranked or Turbo history from the pinned profile; the latest pro and public feeds remain one click away. Includes league, team, mode, lobby, rank, duration and time filters on the public feed, and mode-aware result/KDA cards for your games.
@@ -43,13 +43,17 @@ The Windows app includes a display-only draft overlay. Start Dota 2 in **Borderl
 
 ## Ranked and Turbo auto-parse setup (Windows)
 
+Use the **full portable Windows release** and open **Parser lab → Automatic Turbo replays**. With a pinned Dota profile, the worker checks for Turbo games from the past three days on startup and every 30 minutes, and retries pending replays across restarts. The Windows post-game watcher still catches finished matches as you play.
+
+If OpenDota has no working replay link, select **Connect with Steam Guard** once and approve the QR sign-in using a separate Steam account with Dota 2. Use your usual account to play. A separate account avoids competing Steam sessions. The worker can then request replay links directly from Valve while DotaScope is running. The replay and its parsed stats stay on this PC. A replay Valve no longer serves can only be parsed if a local copy exists.
+
 DotaScope reads the local game through Valve's official **Game State Integration** feed. There is no Live suggestions screen; GSI is used only to detect finished Ranked standard and Turbo games so the local parser can extend your history beyond OpenDota's public sample.
 
 1. Copy
    [`public/integrations/gamestate_integration_dotascope.cfg`](public/integrations/gamestate_integration_dotascope.cfg) to
    `…\Steam\steamapps\common\dota 2 beta\game\dota\cfg\gamestate_integration\`.
 2. Keep `-gamestateintegration` in Dota 2's Steam launch options.
-3. Start DotaScope before playing. The Windows launcher starts the local parser worker automatically when it finds the worker checkout; on the web build run `node worker/parser-worker.mjs` manually. DotaScope will auto-parse each finished Ranked standard or Turbo game and append it to the local history.
+3. Start DotaScope before playing. The Windows portable launcher starts the worker automatically. The local web build can use a manually started worker for OpenDota downloads and local files.
 
 The bridge listens only on `127.0.0.1:53000`. It never reads game memory or touches game files beyond loading the user-installed GSI config.
 
@@ -123,13 +127,13 @@ The native builds are bundled in this project:
 | File | What it is |
 | --- | --- |
 | `DotaScope-1.0.0.apk` | Signed release APK for Android 7.0+ (minSdk 24, targetSdk 36) |
-| `DotaScope-1.0.0-win-x64.exe` | Portable Windows x64 app (about 64 MB) for PCs that already have Node, Java and 7-Zip or only need the web app. |
-| `DotaScope-1.0.0-portable-full.zip` | **Recommended for most Windows users.** Self-contained folder with the app, Node 26, Java 21, 7-Zip, parser JAR and GSI config; one-click setup. About 270 MB unpacked. |
-| `DotaScope-1.0.0.zip` | Static web build for the PWA / browser fallback. |
+| `DotaScope-1.1.0-win-x64.exe` | Portable Windows x64 app (about 64 MB) for PCs that already have Node, Java and 7-Zip or only need the web app. |
+| `DotaScope-1.1.0-portable-full.zip` | **Recommended for most Windows users.** Self-contained folder with the app, Node 26, Java 21, 7-Zip, parser JAR and GSI config; one-click setup. About 270 MB unpacked. |
+| `DotaScope-1.1.0.zip` | Static web build for the PWA / browser fallback. |
 
-**Windows (recommended):** download `DotaScope-1.0.0-portable-full.zip`, extract the whole folder, and run `Setup.cmd` once. Setup installs the Dota GSI config and adds `-gamestateintegration` to Dota 2's Steam launch options (close Steam when prompted). Then run `DotaScope-1.0.0-win-x64.exe`. The folder already contains Node 26, a minimal Java 21 runtime, 7-Zip, the OpenDota parser JAR, the worker and the GSI config, so Parser lab and automatic parsing work without installing developer tools. Keep the folder together; this build keeps its history in the `data` folder beside the EXE, so preserve `data` when updating the portable folder.
+**Windows (recommended):** download `DotaScope-1.1.0-portable-full.zip`, extract the whole folder, and run `Setup.cmd` once. Setup installs the Dota GSI config and adds `-gamestateintegration` to Dota 2's Steam launch options (close Steam when prompted). Then run `DotaScope-1.1.0-win-x64.exe`. The folder already contains Node 26, a minimal Java 21 runtime, 7-Zip, the OpenDota parser JAR, the worker and the GSI config, so Parser lab and automatic parsing work without installing developer tools. Keep the folder together; this build keeps its history in the `data` folder beside the EXE, so preserve `data` when updating the portable folder.
 
-**Windows (minimal EXE):** `DotaScope-1.0.0-win-x64.exe` runs the web app and Steam/profile features by itself, but Parser lab and auto-parse stay offline unless `worker/parser-worker.mjs`, Node, Java and 7-Zip are provided. Use the full portable ZIP for the complete feature set. Windows SmartScreen may warn because the build is not Authenticode-signed; choose **More info → Run anyway**. The app needs the **Microsoft Edge WebView2 Runtime** (already present on current Windows 10/11 systems) and .NET Framework 4.8 (included with Windows 10/11). There is no installer and no Electron runtime.
+**Windows (minimal EXE):** `DotaScope-1.1.0-win-x64.exe` runs the web app and Steam/profile features by itself, but Parser lab and auto-parse stay offline unless `worker/parser-worker.mjs`, Node, Java and 7-Zip are provided. Use the full portable ZIP for the complete feature set. Windows SmartScreen may warn because the build is not Authenticode-signed; choose **More info → Run anyway**. The app needs the **Microsoft Edge WebView2 Runtime** (already present on current Windows 10/11 systems) and .NET Framework 4.8 (included with Windows 10/11). There is no installer and no Electron runtime.
 
 The EXE is a portable launcher with the full WebView2 app embedded inside. It chooses a writable data directory (`%LOCALAPPDATA%\DotaScope`, then `%APPDATA%\DotaScope`, then a `data` folder beside the EXE), sets its own extraction paths, and starts the host. You do **not** need to set `DOTNET_BUNDLE_EXTRACT_BASE_DIR` manually. Launching from the installed Steam shortcut uses the same launcher and picks up the active Steam account.
 
@@ -178,7 +182,7 @@ The app never asks for a Steam password, Steam Guard code, private inventory dat
 
 ![DotaScope Steam artwork](steam-art/steam-preview.jpg)
 
-On Windows, after building `DotaScope-1.0.0-win-x64.exe`, install the shortcut and artwork with:
+On Windows, after building `DotaScope-1.1.0-win-x64.exe`, install the shortcut and artwork with:
 
 ```bash
 python scripts/install-steam-shortcut.py
@@ -203,7 +207,7 @@ For Windows, install **.NET SDK 8 or newer** and run:
 npm run windows:build
 ```
 
-The script builds the web bundle, packs `dist/` into `windows/web.zip`, restores the WebView2 NuGet package using `windows/NuGet.config`, publishes the self-contained WebView2 host to `windows/DotaScope-app.exe`, then wraps it in a small .NET Framework portable launcher and writes `DotaScope-1.0.0-win-x64.exe` to the project root. The host serves the embedded `web.zip` through a virtual `https://dotascope.local` origin and renders it with WebView2. It does not use Electron. The launcher is built with the .NET Framework 4.8 `csc.exe` included with Windows; no Visual Studio install is required.
+The script builds the web bundle, packs `dist/` into `windows/web.zip`, restores the WebView2 NuGet package using `windows/NuGet.config`, publishes the self-contained WebView2 host to `windows/DotaScope-app.exe`, then wraps it in a small .NET Framework portable launcher and writes `DotaScope-1.1.0-win-x64.exe` to the project root. The host serves the embedded `web.zip` through a virtual `https://dotascope.local` origin and renders it with WebView2. It does not use Electron. The launcher is built with the .NET Framework 4.8 `csc.exe` included with Windows; no Visual Studio install is required.
 
 The Windows binary is unsigned. For public distribution, add an Authenticode code-signing certificate and sign the generated EXE. The Android release key in `android/` is for local sideloading/updates: keep it safe and reuse it for future versions, or replace it with your own production key before publishing.
 

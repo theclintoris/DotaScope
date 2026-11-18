@@ -11,7 +11,8 @@ source explain non-obvious decisions rather than restating syntax.
 | Web UI | `src/App.tsx`, `src/pages/`, `src/components/` | Routes, screens, reusable visual components. |
 | Shared state | `src/context/ProfileContext.tsx`, `src/context/MetaContext.tsx` | Pinned Dota profile and the global Ranked/Turbo + bracket lens. |
 | OpenDota access | `src/lib/api.ts` | Cached/deduped public API calls; optional stored key is supported internally but no UI prompt exposes it. |
-| Local parser worker | `worker/parser-worker.mjs` | HTTP API on `127.0.0.1:5601`; runs the Java OpenDota parser and persists parsed JSON. |
+| Local parser worker | `worker/parser-worker.mjs`, `worker/replay-collector.mjs` | Runs the Java OpenDota parser, discovers recent Turbo games, and persists the retry queue and parse results. |
+| Steam replay access | `windows/ReplaySteamSession.cs`, `windows/GsiBridge.cs` | Links a replay account via Steam Guard and requests replay coordinates from the Dota Game Coordinator. |
 | Java parser | `.toolchain/odota-parser/`, `runtime/parser/` | Raw `.dem` replay parser; invoked only by the worker. |
 | Native Windows host | `windows/Program.cs`, `windows/Launcher.cs`, `windows/WorkerRuntime.cs` | WebView2 shell, single-instance launcher, bundled runtime discovery, worker lifecycle. |
 | Draft overlay | `windows/OverlayForm.cs`, `src/pages/DraftOverlay.tsx`, `src/overlay.css` | Separate click-through topmost WebView2 window and its compact draft view. |

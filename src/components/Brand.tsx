@@ -18,7 +18,7 @@ export function LogoMark({ size = 34 }: { size?: number }) {
       />
       <path
         d="M22 9.2 33.4 15.8v12.4L22 34.8 10.6 28.2V15.8L22 9.2Z"
-        fill="url(#logo-core)"
+        fill="currentColor"
         fillOpacity=".13"
         stroke="currentColor"
         strokeOpacity=".55"
@@ -27,12 +27,6 @@ export function LogoMark({ size = 34 }: { size?: number }) {
       <path d="m22 12.5 7.4 18-7.4-4.8-7.4 4.8 7.4-18Z" fill="currentColor" />
       <path d="m22 12.5 7.4 18-7.4-4.8V12.5Z" fill="#fff" fillOpacity=".22" />
       <circle cx="22" cy="22" r="12.8" stroke="currentColor" strokeOpacity=".2" strokeDasharray="2 6" />
-      <defs>
-        <linearGradient id="logo-core" x1="12" y1="10" x2="32" y2="34" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#f0bd72" />
-          <stop offset="1" stopColor="#c35d3d" />
-        </linearGradient>
-      </defs>
     </svg>
   )
 }
@@ -43,12 +37,7 @@ export function Brand({ compact = false }: { compact?: boolean }) {
       <span className="brand-glyph">
         <LogoMark size={compact ? 29 : 36} />
       </span>
-      <span className="brand-type">
-        <span className="brand-name">
-          DOTA<span>SCOPE</span>
-        </span>
-        {!compact && <span className="brand-sub">META INTELLIGENCE</span>}
-      </span>
+      <span className="brand-name">Dota<span>Scope</span></span>
     </Link>
   )
 }

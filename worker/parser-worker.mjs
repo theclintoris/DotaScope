@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import {
-  copyFileSync,
+  mkdtempSync,
   createReadStream,
   createWriteStream,
   existsSync,
@@ -10,14 +10,19 @@ import {
   renameSync,
   rmSync,
   statSync,
+  openSync,
+  readSync,
+  closeSync,
   writeFileSync,
 } from 'node:fs'
 import { createServer } from 'node:http'
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
-import { basename, dirname, extname, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
+import * as zlib from 'node:zlib'
+import { createReplayCollector } from './replay-collector.mjs'
 
 const PORT = Number(process.env.PARSER_WORKER_PORT ?? 5601)
 const PARSER_URL = process.env.OPENDOTA_PARSER_URL ?? 'http://127.0.0.1:5600'
@@ -26,6 +31,9 @@ const ROOT = process.cwd()
 const DATA_DIR = resolve(process.env.PARSER_DATA_DIR ?? join(ROOT, 'worker', 'data'))
 const DEFAULT_REPLAY_DIR = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\dota 2 beta\\game\\dota\\replays'
 const REPLAY_DIR = resolve(process.env.DOTA_REPLAY_DIR ?? DEFAULT_REPLAY_DIR)
+const COLLECTED_DIR = join(DATA_DIR, 'replays')
+const STEAM_BRIDGE = 'http://127.0.0.1:53000'
+const STEAM_BRIDGE_TOKEN = process.env.DOTASCOPE_REPLAY_BRIDGE_TOKEN
 const JAVA_BIN = process.env.JAVA_BIN ?? join(ROOT, '.toolchain', 'jdk-21.0.13+9', 'bin', 'java.exe')
 const PARSER_JAR = process.env.OPENDOTA_PARSER_JAR ?? join(ROOT, '.toolchain', 'odota-parser', 'target', 'stats-0.1.0.jar')
 const SEVEN_ZIP_BIN = process.env.SEVEN_ZIP_BIN ?? 'C:\\Program Files\\7-Zip\\7z.exe'
@@ -69,26 +77,24 @@ function safeId(value) {
 }
 
 function replayPath(matchId) {
-  const exact = join(REPLAY_DIR, `${matchId}.dem`)
-  if (existsSync(exact)) return exact
-  return null
+  return [REPLAY_DIR, COLLECTED_DIR]
+    .map((directory) => join(directory, matchId + '.dem'))
+    .find((file) => existsSync(file)) ?? null
 }
 
 function listReplays() {
-  if (!existsSync(REPLAY_DIR)) return []
-  return readdirSync(REPLAY_DIR)
-    .filter((name) => name.toLowerCase().endsWith('.dem'))
-    .map((name) => {
-      const path = join(REPLAY_DIR, name)
-      const stat = statSync(path)
-      return {
-        matchId: name.slice(0, -4),
-        name,
-        bytes: stat.size,
-        modifiedAt: stat.mtime.toISOString(),
-      }
-    })
-    .sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt))
+  const replays = new Map()
+  for (const directory of new Set([COLLECTED_DIR, REPLAY_DIR])) {
+    if (!existsSync(directory)) continue
+    for (const file of readdirSync(directory, { withFileTypes: true })) {
+      if (!file.isFile() || !file.name.toLowerCase().endsWith('.dem')) continue
+      const matchId = file.name.slice(0, -4)
+      const stat = statSync(join(directory, file.name), { throwIfNoEntry: false })
+      if (!stat) continue
+      replays.set(matchId, { matchId, name: file.name, bytes: stat.size, modifiedAt: stat.mtime.toISOString() })
+    }
+  }
+  return [...replays.values()].sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt))
 }
 
 async function parserHealthy() {
@@ -174,7 +180,7 @@ function accountIdFromSteamId(steamId) {
   }
 }
 
-async function summarise(rawPath, matchId) {
+async function summarise(rawPath, matchId, match) {
   const last = new Map()
   const timelineBuckets = new Map()
   const playerSlots = new Map()
@@ -246,7 +252,6 @@ async function summarise(rawPath, matchId) {
 
   if (last.size === 0) throw new Error('The parser produced no player interval data.')
 
-  const match = await openDotaMatch(matchId)
   const odPlayers = new Map()
   if (match && Array.isArray(match.players)) {
     for (const player of match.players) {
@@ -393,87 +398,98 @@ async function summarise(rawPath, matchId) {
   }
 }
 
-function runSevenZip(args) {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(SEVEN_ZIP_BIN, args, { windowsHide: true })
-    let stderr = ''
-    child.stderr.on('data', (chunk) => { stderr += chunk.toString() })
-    child.on('error', rejectPromise)
-    child.on('close', (code) => {
-      if (code === 0) resolvePromise()
-      else rejectPromise(new Error(`7-Zip exited ${code}: ${stderr.slice(-300)}`))
-    })
+async function runSevenZip(args, target) {
+  if (!existsSync(SEVEN_ZIP_BIN)) throw new Error('7-Zip was not found at ' + SEVEN_ZIP_BIN + '.')
+  const child = spawn(SEVEN_ZIP_BIN, args, { windowsHide: true })
+  child.stderr.resume()
+  await Promise.all([
+    pipeline(child.stdout, createWriteStream(target)),
+    new Promise((resolvePromise, rejectPromise) => {
+      child.on('error', rejectPromise)
+      child.on('close', (code) => {
+        if (code === 0) resolvePromise()
+        else rejectPromise(new Error('7-Zip could not decompress the replay (exit ' + code + ').'))
+      })
+    }),
+  ])
+}
+
+async function steamReplay(matchId) {
+  if (!STEAM_BRIDGE_TOKEN) return null
+  const response = await fetch(STEAM_BRIDGE + '/replay-steam/match/' + matchId, {
+    headers: { 'x-dotascope-replay': STEAM_BRIDGE_TOKEN },
+    signal: AbortSignal.timeout(45_000),
   })
+  const result = await response.json()
+  if (!response.ok) throw new Error(result.error ?? 'Steam replay lookup failed.')
+  return result
 }
 
-async function downloadReplay(matchId, match) {
-  const replayUrl = match?.replay_url
-  if (typeof replayUrl !== 'string' || !replayUrl.startsWith('http')) {
-    throw new Error(`No replay URL is available from OpenDota for ${matchId}.`)
-  }
-  if (!existsSync(SEVEN_ZIP_BIN)) throw new Error(`7-Zip was not found at ${SEVEN_ZIP_BIN}.`)
-
-  mkdirSync(DATA_DIR, { recursive: true })
-  mkdirSync(REPLAY_DIR, { recursive: true })
-  const archivePath = join(DATA_DIR, `${matchId}.dem.bz2`)
-  const tempDir = join(DATA_DIR, `replay-${matchId}`)
-
-  const response = await fetch(replayUrl, { signal: AbortSignal.timeout(180000) })
-  if (!response.ok || !response.body) {
-    throw new Error(`Replay download failed (${response.status}).`)
-  }
-  await pipeline(Readable.fromWeb(response.body), createWriteStream(archivePath))
-
-  rmSync(tempDir, { recursive: true, force: true })
-  mkdirSync(tempDir, { recursive: true })
-  await runSevenZip(['x', '-y', `-o${tempDir}`, archivePath])
-
-  const extracted = readdirSync(tempDir).find((name) => name.toLowerCase().endsWith('.dem'))
-  if (!extracted) throw new Error('7-Zip extracted the replay but no .dem file was found.')
-  const target = join(REPLAY_DIR, `${matchId}.dem`)
-  const source = join(tempDir, extracted)
+function valveReplayUrl(value, matchId) {
   try {
-    renameSync(source, target)
-  } catch (error) {
-    if (error?.code !== 'EXDEV') throw error
-    copyFileSync(source, target)
-    rmSync(source, { force: true })
+    const url = new URL(value)
+    const allowedHost = /^replay\d+\.(valve\.net|dota2\.com\.cn)$/.test(url.hostname)
+    const path = /^\/570\/(\d+)_\d+\.dem(?:\.(?:bz2|zst))?$/.exec(url.pathname)
+    if (allowedHost && /^https?:$/.test(url.protocol) && !url.username && !url.password && !url.port && path?.[1] === matchId) return url
+  } catch {
+    // Missing or invalid URLs can still be resolved by the Steam provider.
   }
-  rmSync(archivePath, { force: true })
-  rmSync(tempDir, { recursive: true, force: true })
-  return target
+  return null
 }
 
-async function parseReplay(matchId, options = {}) {
+async function downloadReplay(matchId, replayUrl) {
+  mkdirSync(COLLECTED_DIR, { recursive: true })
+  const temp = mkdtempSync(join(COLLECTED_DIR, '.download-'))
+  const archive = join(temp, 'replay.dem.bz2')
+  const dem = join(temp, 'replay.dem')
+  try {
+    const response = await fetch(replayUrl, { redirect: 'error', signal: AbortSignal.timeout(180_000) })
+    if (!response.ok || !response.body) throw new Error('Valve replay download returned ' + response.status + '.')
+    await pipeline(Readable.fromWeb(response.body), createWriteStream(archive))
+    const header = Buffer.alloc(8)
+    const handle = openSync(archive, 'r')
+    try { readSync(handle, header) } finally { closeSync(handle) }
+    if (header.readUInt32LE(0) === 0xfd2fb528 && zlib.createZstdDecompress) {
+      await pipeline(createReadStream(archive), zlib.createZstdDecompress(), createWriteStream(dem))
+    } else if (header.subarray(0, 3).toString() === 'BZh' || header.readUInt32LE(0) === 0xfd2fb528) {
+      await runSevenZip(['e', '-y', '-so', archive], dem)
+    } else if (header.subarray(0, 7).toString() === 'PBDEMS2') {
+      renameSync(archive, dem)
+    } else {
+      throw new Error('Valve returned an unrecognised replay file.')
+    }
+    const target = join(COLLECTED_DIR, matchId + '.dem')
+    renameSync(dem, target)
+    return target
+  } finally {
+    rmSync(temp, { recursive: true, force: true })
+  }
+}
+
+let parseTail = Promise.resolve()
+function parseReplay(matchId, options) {
+  const task = parseTail.then(() => parseReplayNow(matchId, options))
+  parseTail = task.catch(() => {})
+  return task
+}
+
+async function parseReplayNow(matchId, options = {}) {
   const { force = false, download = false, turboOnly = false, competitiveOnly = false } =
     typeof options === 'boolean' ? { force: options } : options
-  const match = await openDotaMatch(matchId)
-  if (turboOnly && match && Number(match.game_mode) !== 23) {
-    return {
-      skipped: true,
-      reason: 'not-turbo',
-      matchId,
-      gameMode: typeof match?.game_mode === 'number' ? match.game_mode : null,
+  const skip = (gameMode, lobbyType) => {
+    if (turboOnly && gameMode && gameMode !== 23) return { skipped: true, reason: 'not-turbo', matchId, gameMode }
+    if (competitiveOnly && gameMode && gameMode !== 23 && (gameMode !== 22 || lobbyType !== 7)) {
+      return { skipped: true, reason: 'not-ranked-or-turbo', matchId, gameMode, lobbyType }
     }
-  }
-  if (competitiveOnly && match) {
-    const gameMode = Number(match.game_mode)
-    const lobbyType = Number(match.lobby_type)
-    if (gameMode !== 23 && lobbyType !== 7) {
-      return {
-        skipped: true,
-        reason: 'not-ranked-or-turbo',
-        matchId,
-        gameMode: Number.isFinite(gameMode) ? gameMode : null,
-        lobbyType: Number.isFinite(lobbyType) ? lobbyType : null,
-      }
-    }
+    return null
   }
 
   const rawPath = join(DATA_DIR, `${matchId}.jsonl`)
   const statsPath = join(DATA_DIR, `${matchId}.stats.json`)
   if (!force && existsSync(statsPath)) {
     const cachedStats = JSON.parse(readFileSync(statsPath, 'utf8'))
+    const skipped = skip(cachedStats.match?.gameMode, cachedStats.match?.lobbyType)
+    if (skipped) return skipped
     const hasWardPayload = Array.isArray(cachedStats.wards)
     const hasTimeline = Array.isArray(cachedStats.timeline)
     if (hasWardPayload && hasTimeline) {
@@ -481,30 +497,59 @@ async function parseReplay(matchId, options = {}) {
       return { cached: true, ...cachedStats }
     }
     // Old cache: upgrade it when the replay is still available locally.
-    if (!existsSync(replayPath(matchId))) {
+    if (!replayPath(matchId)) {
       try { recordParsedHistories(cachedStats) } catch { /* cache remains usable */ }
       return { cached: true, ...cachedStats }
     }
   }
 
-  if (!(await ensureParser())) throw new Error('OpenDota parser is not reachable.')
-  let replay = replayPath(matchId)
-  if (!replay && download) replay = await downloadReplay(matchId, match)
-  if (!replay) throw new Error(`No local replay found for ${matchId}. Download the replay in Dota 2 first.`)
+  let match = await openDotaMatch(matchId)
+  const skipped = skip(Number(match?.game_mode), Number(match?.lobby_type))
+  if (skipped) return skipped
 
-  const body = readFileSync(replay)
+  let replay = replayPath(matchId)
+  if (!replay && download) {
+    const url = valveReplayUrl(match?.replay_url, matchId)
+    let downloadError = null
+    if (url) {
+      try { replay = await downloadReplay(matchId, url) } catch (error) { downloadError = error }
+    }
+    if (!replay) {
+      const steam = await steamReplay(matchId)
+      const steamUrl = valveReplayUrl(steam?.replay_url, matchId)
+      if (!steamUrl) throw downloadError ?? new Error('No replay URL is available yet. Connect Steam replay access in Parser lab to check Valve directly.')
+      match = {
+        ...match,
+        ...steam,
+        game_mode: steam.game_mode || match?.game_mode,
+        start_time: steam.start_time || match?.start_time,
+      }
+      const skippedSteam = skip(Number(match.game_mode), Number(match.lobby_type))
+      if (skippedSteam) return skippedSteam
+      replay = await downloadReplay(matchId, steamUrl)
+    }
+  }
+  if (!replay) throw new Error('No local replay found for ' + matchId + '.')
+  await ensureParser()
+
   const response = await fetch(PARSER_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/octet-stream' },
-    body,
+    body: createReadStream(replay),
+    duplex: 'half',
     signal: AbortSignal.timeout(180000),
   })
   if (!response.ok) {
     throw new Error(`Parser rejected the replay (${response.status}): ${(await response.text()).slice(0, 300)}`)
   }
   writeFileSync(rawPath, Buffer.from(await response.arrayBuffer()))
-  const stats = await summarise(rawPath, matchId)
-  writeFileSync(statsPath, `${JSON.stringify(stats, null, 2)}\n`)
+  const stats = await summarise(rawPath, matchId, match)
+  const skippedStats = skip(stats.match.gameMode, stats.match.lobbyType)
+  if (skippedStats) return skippedStats
+  if ((turboOnly || competitiveOnly) && !stats.match.gameMode) throw new Error('The replay mode could not be verified.')
+  if (!stats.players.length) throw new Error('No player stats were found in the replay.')
+  writeFileSync(statsPath + '.tmp', `${JSON.stringify(stats, null, 2)}\n`)
+  renameSync(statsPath + '.tmp', statsPath)
   try { recordParsedHistories(stats) } catch { /* parse result is still usable */ }
   return { cached: false, ...stats }
 }
@@ -1025,6 +1070,43 @@ async function scanReplayFolder() {
   }
 }
 
+async function discoverTurbo(accountId) {
+  const response = await fetch(API_BASE + '/players/' + accountId + '/matches?game_mode=23&significant=0&date=3&limit=20', {
+    signal: AbortSignal.timeout(20_000),
+  })
+  if (!response.ok) throw new Error('OpenDota match history returned ' + response.status + '.')
+  const matches = await response.json()
+  return matches.filter((match) => match.game_mode === 23).map((match) => ({
+    matchId: String(match.match_id),
+    endedAt: (match.start_time + match.duration) * 1000,
+  }))
+}
+
+let coordinatorState = STEAM_BRIDGE_TOKEN ? 'available' : 'desktop-required'
+const collector = createReplayCollector({
+  file: join(DATA_DIR, 'replay-collector.json'),
+  discover: discoverTurbo,
+  parse: (matchId) => parseReplay(matchId, { download: true, turboOnly: true }),
+  coordinator: () => coordinatorState,
+})
+
+async function refreshCoordinatorState() {
+  if (!STEAM_BRIDGE_TOKEN) return
+  try {
+    const response = await fetch(STEAM_BRIDGE + '/replay-steam/status', {
+      headers: { 'x-dotascope-replay': STEAM_BRIDGE_TOKEN },
+      signal: AbortSignal.timeout(1500),
+    })
+    if (response.ok) coordinatorState = (await response.json()).state
+  } catch {
+    coordinatorState = 'available'
+  }
+}
+
+function collectorOriginAllowed(origin) {
+  return !origin || origin === 'https://dotascope.local' || /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(origin)
+}
+
 const server = createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
@@ -1038,6 +1120,29 @@ const server = createServer(async (req, res) => {
 
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? '127.0.0.1'}`)
   try {
+    if (url.pathname === '/collector') {
+      if (!collectorOriginAllowed(req.headers.origin)) return json(res, 403, { error: 'Open the local DotaScope app to manage replay collection.' })
+      if (req.method === 'GET') {
+        await refreshCoordinatorState()
+        return json(res, 200, collector.status())
+      }
+      if (req.method === 'POST') {
+        if (!req.headers['content-type']?.startsWith('application/json')) return json(res, 415, { error: 'Expected JSON.' })
+        let body = ''
+        for await (const chunk of req) {
+          body += chunk
+          if (body.length > 2048) throw new Error('Request body too large')
+        }
+        const { accountId, paused, scan } = JSON.parse(body)
+        if ((accountId !== undefined && accountId !== null && (!Number.isInteger(accountId) || accountId < 1 || accountId > 4294967295)) ||
+            (paused !== undefined && typeof paused !== 'boolean')) return json(res, 400, { error: 'Invalid collector settings.' })
+        collector.configure({ accountId, paused })
+        if (scan === true) collector.wake()
+        void collector.scan()
+        return json(res, 200, collector.status())
+      }
+    }
+
     if (req.method === 'GET' && url.pathname === '/health') {
       const parser = await parserHealthy()
       return json(res, 200, {
@@ -1173,6 +1278,11 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`Replay directory: ${REPLAY_DIR}`)
   seedKnownReplays()
   setInterval(() => { void scanReplayFolder() }, 5000).unref()
+  setInterval(() => {
+    void collector.scan()
+    void collector.process().catch((error) => console.error('Replay collector:', error.message))
+  }, 5000).unref()
+  void collector.scan()
 })
 
 function shutdown() {

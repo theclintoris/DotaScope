@@ -5,6 +5,14 @@ All notable changes to DotaScope are recorded here. The public release lives at
 
 ## [Unreleased]
 
+## v1.1.0
+
+- **Automatic Turbo replays** finds recent games for your pinned Dota profile and queues local downloads and parses. The queue survives restarts and shows waiting, parsed, and unavailable replays in Parser lab.
+- **Steam replay access** checks Valve's Game Coordinator when OpenDota has no working replay link. The Windows portable app links a separate Steam account through Steam Guard and stores the authorization using Windows user encryption.
+- **Interface refresh** groups navigation, consolidates the population controls, and adds one sortable hero leaderboard.
+
+## v1.0.0
+
 ### Added
 
 - **Automatic replay retry queue** — when a post-game replay URL is not

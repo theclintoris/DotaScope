@@ -49,6 +49,7 @@ internal static class Program
 
         TryPrepareWebView2Loader(dataRoot);
         GsiSetup.Ensure();
+        ReplaySteamSession.Start(dataRoot);
         GsiBridge.Start();
 
         string webRoot;
@@ -377,6 +378,24 @@ internal sealed class MainForm : Form
                 Text = string.IsNullOrWhiteSpace(core.DocumentTitle)
                     ? "DotaScope"
                     : core.DocumentTitle;
+            };
+
+            core.WebMessageReceived += (_, args) =>
+            {
+                if (!IsAppUrl(args.Source)) return;
+                try
+                {
+                    var command = args.TryGetWebMessageAsString();
+                    if (command == "replay-steam-link")
+                        ReplaySteamSession.ShowLinkDialog(this, ReadSteamId64());
+                    else if (command == "replay-steam-unlink")
+                        ReplaySteamSession.Disconnect();
+                }
+                catch (Exception ex)
+                {
+                    Program.Log("Replay account control failed: " + ex.GetType().Name);
+                    MessageBox.Show(this, "Could not change Steam replay access.", "DotaScope");
+                }
             };
 
             core.Navigate(BuildStartUrl());
