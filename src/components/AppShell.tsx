@@ -31,6 +31,7 @@ import { Brand } from './Brand'
 import { MetaLens } from './MetaLens'
 import { CommandPalette } from './CommandPalette'
 import { AutoParserWatcher } from './AutoParserWatcher'
+import { ReplayCollectorProfileSync } from './ReplayCollector'
 import { InstallDialog } from './InstallDialog'
 import { ProfileDialog } from './ProfileDialog'
 import { PlayerAvatar, RankBadge } from './ui'
@@ -286,6 +287,7 @@ export function AppShell() {
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} />
       <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
       <AutoParserWatcher />
+      <ReplayCollectorProfileSync />
       <InstallDialog
         open={installOpen}
         onClose={() => setInstallOpen(false)}

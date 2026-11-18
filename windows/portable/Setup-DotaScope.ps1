@@ -222,7 +222,7 @@ if (-not $SkipSteamOptions) {
 }
 
 Write-Host ""
-Write-Host "Setup complete. Start DotaScope-1.0.0-win-x64.exe." -ForegroundColor Cyan
+Write-Host "Setup complete. Start DotaScope-1.1.0-win-x64.exe." -ForegroundColor Cyan
 Write-Host "Start Dota 2 from Steam normally (the launch option is now saved)."
 Write-Host ""
 Read-Host "Press Enter to close"

@@ -73,7 +73,7 @@ internal static class GsiSetup
         return candidates.FirstOrDefault(File.Exists);
     }
 
-    private static string? FindDotaCfgDirectory()
+    internal static string? FindDotaCfgDirectory()
     {
         string? configured = Environment.GetEnvironmentVariable("DOTASCOPE_DOTA_CFG");
         if (!string.IsNullOrWhiteSpace(configured) && Directory.Exists(configured))

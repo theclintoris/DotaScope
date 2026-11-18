@@ -55,6 +55,10 @@ internal static class WorkerRuntime
             };
             start.ArgumentList.Add(script);
             start.Environment["PARSER_DATA_DIR"] = Path.Combine(dataRoot, "worker-data");
+            start.Environment["DOTASCOPE_REPLAY_BRIDGE_TOKEN"] = ReplaySteamSession.BridgeToken;
+            string? cfg = GsiSetup.FindDotaCfgDirectory();
+            if (cfg != null && !start.Environment.ContainsKey("DOTA_REPLAY_DIR"))
+                start.Environment["DOTA_REPLAY_DIR"] = Path.GetFullPath(Path.Combine(cfg, "..", "replays"));
             SetRuntimeEnvironment(start, portableRoot);
 
             var worker = new Process { StartInfo = start };

@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace DotaScope;
 
@@ -120,6 +122,7 @@ internal static class GsiBridge
                 string path = requestLine[1].Split('?')[0];
                 int contentLength = 0;
                 bool expectsContinue = false;
+                string? replayToken = null;
                 for (int i = 1; i < lines.Length; i++)
                 {
                     int colon = lines[i].IndexOf(':');
@@ -132,6 +135,10 @@ internal static class GsiBridge
                     if (string.Equals(name, "Content-Length", StringComparison.OrdinalIgnoreCase))
                     {
                         int.TryParse(value, out contentLength);
+                    }
+                    else if (string.Equals(name, "X-DotaScope-Replay", StringComparison.OrdinalIgnoreCase))
+                    {
+                        replayToken = value;
                     }
                     else if (string.Equals(name, "Expect", StringComparison.OrdinalIgnoreCase) &&
                              value.Contains("100-continue", StringComparison.OrdinalIgnoreCase))
@@ -156,6 +163,39 @@ internal static class GsiBridge
                 {
                     await WriteResponseAsync(stream, 200, "{\"ok\":true,\"service\":\"dotascope-gsi\"}", true).ConfigureAwait(false);
                     return;
+                }
+
+                if (method == "GET" && path.StartsWith("/replay-steam/", StringComparison.Ordinal))
+                {
+                    if (replayToken == null || !CryptographicOperations.FixedTimeEquals(
+                        Encoding.ASCII.GetBytes(replayToken), Encoding.ASCII.GetBytes(ReplaySteamSession.BridgeToken)))
+                    {
+                        await WriteResponseAsync(stream, 404, "{}", false).ConfigureAwait(false);
+                        return;
+                    }
+                    if (path == "/replay-steam/status")
+                    {
+                        await WriteResponseAsync(stream, 200, JsonSerializer.Serialize(new
+                        {
+                            state = ReplaySteamSession.Linked ? "linked" : "available",
+                        }), false).ConfigureAwait(false);
+                        return;
+                    }
+                    const string prefix = "/replay-steam/match/";
+                    if (path.StartsWith(prefix, StringComparison.Ordinal) && ulong.TryParse(path[prefix.Length..], out ulong matchId) && matchId > 0)
+                    {
+                        try
+                        {
+                            object replay = await ReplaySteamSession.LookupAsync(matchId).ConfigureAwait(false);
+                            await WriteResponseAsync(stream, 200, JsonSerializer.Serialize(replay), false).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            string error = ex is InvalidOperationException ? ex.Message : "Steam replay lookup was unavailable. DotaScope will retry.";
+                            await WriteResponseAsync(stream, 503, JsonSerializer.Serialize(new { error }), false).ConfigureAwait(false);
+                        }
+                        return;
+                    }
                 }
 
                 if (method != "POST" || !path.Equals("/gsi", StringComparison.OrdinalIgnoreCase))
@@ -241,6 +281,7 @@ internal static class GsiBridge
             204 => "No Content",
             400 => "Bad Request",
             404 => "Not Found",
+            503 => "Service Unavailable",
             _ => "OK",
         };
         byte[] bytes = Encoding.UTF8.GetBytes(body);

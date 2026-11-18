@@ -9,8 +9,8 @@
     <AssemblyName>DotaScope</AssemblyName>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <Version>1.0.0</Version>
-    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.1.0</Version>
+    <FileVersion>1.1.0.0</FileVersion>
     <Product>DotaScope</Product>
     <Description>Dota 2 meta intelligence cockpit powered by the OpenDota public API.</Description>
     <Company>DotaScope</Company>
@@ -31,6 +31,9 @@
   <ItemGroup>
     <Compile Remove="Launcher.cs" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+    <PackageReference Include="SteamKit2" Version="3.3.1" />
+    <PackageReference Include="QRCoder" Version="1.8.1" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
     <EmbeddedResource Include="web.zip" LogicalName="DotaScope.web.zip" />
     <EmbeddedResource Include="WebView2Loader.dll" LogicalName="DotaScope.WebView2Loader.dll" />
   </ItemGroup>
